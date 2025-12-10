@@ -1,0 +1,16 @@
+.pio/
+.vscode/
+.idea/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.a
+*.bin
+*.elf
+*.map
+*.hex
+.DS_Store
+sdkconfig.*.old
+sdkconfig*
