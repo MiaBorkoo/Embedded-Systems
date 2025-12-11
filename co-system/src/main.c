@@ -4,8 +4,8 @@
 #include "freertos/queue.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "wifi_manager.h"
-#include "mqtt_handler.h"
+#include "communication/wifi_manager.h"
+#include "communication/mqtt_handler.h"
 #include "shared_types.h"
 
 static const char *TAG = "MAIN";
@@ -93,15 +93,3 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
-
-//RUAN - THIS IS THE HARDWARE STUFF
-//door_init();  //initalises door system its a gpio interrupt , dont need to poll
-//its the green led, servo motor and button 
-
-    // emergency_init(); // emergency rn is just red LED, open door
-    // emergency_trigger(true); // for the emergency state to work, door needs to be initialised first
-
-    // buzzer_init();
-    // buzzer_set_active(true); - this make the buzzer beep continously
-
-    //sensor_init(); this is the CO sensor 

@@ -15,10 +15,11 @@ idf_component_register(
         "buzzer_task/buzzer.c"
         "buzzer_task/buzzer.h"
         "agent_task.c"
-        "wifi_manager.c"
-        "mqtt_handler.c"
+        "communication/wifi_manager.c"
+        "communication/mqtt_handler.c"
         "ring_buffer.c"
 
-    INCLUDE_DIRS 
+    INCLUDE_DIRS
         "../include"
+        "."
 )
