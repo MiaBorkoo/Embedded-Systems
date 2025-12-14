@@ -14,6 +14,7 @@ idf_component_register(
         "communication/mqtt_handler.c"
         "communication/agent_task.c"
         "communication/ring_buffer.c"
+        "fsm/fsm.c"
 
     INCLUDE_DIRS
         "../include"
@@ -23,4 +24,5 @@ idf_component_register(
         "emergency_state"
         "door_task"
         "buzzer_task"
+        "fsm"
 )

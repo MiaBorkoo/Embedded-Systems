@@ -14,4 +14,23 @@ typedef enum {
     CMD_OPEN_DOOR       // Request door open for ventilation
 } Command_t;
 
+/**
+ * System states - managed by FSM
+ */
+typedef enum {
+    STATE_NORMAL = 0,      // Normal operation, door closed
+    STATE_OPEN = 1,        // Door open (button press)
+    STATE_EMERGENCY = 2    // Emergency mode (CO alarm)
+} SystemState_t;
+
+/**
+ * FSM event types
+ */
+typedef enum {
+    EVENT_BUTTON_PRESS,
+    EVENT_CO_ALARM,      // CO >= threshold
+    EVENT_CMD_TEST,      // Test alarm from server
+    EVENT_CMD_RESET      // Reset emergency from server
+} EventType_t;
+
 #endif // SHARED_TYPES_H

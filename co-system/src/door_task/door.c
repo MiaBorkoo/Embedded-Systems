@@ -1,9 +1,9 @@
 #include "door.h"
+#include "fsm/fsm.h"
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/semphr.h"
 #include "esp_timer.h"
 
 static const char *TAG = "DoorTask";
@@ -15,11 +15,8 @@ static const char *TAG = "DoorTask";
 #define SERVO_TIMER   LEDC_TIMER_0
 #define SERVO_CHANNEL LEDC_CHANNEL_0
 
-#define DOOR_OPEN_MS    5000
 #define DEBOUNCE_MS     200   // 200ms debounce
 
-// Semaphore to signal door open request
-static SemaphoreHandle_t door_sem;
 static volatile int64_t last_press_time = 0;
 
 // Convert angle to duty
@@ -35,33 +32,33 @@ void door_set_angle(uint32_t angle) {
     ledc_update_duty(LEDC_HIGH_SPEED_MODE, SERVO_CHANNEL);
 }
 
-// ISR for button
+// ISR for button - send event to FSM
 void IRAM_ATTR button_isr_handler(void* arg) {
     int64_t now = esp_timer_get_time();
     if (now - last_press_time > DEBOUNCE_MS * 1000) {
-        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xSemaphoreGiveFromISR(door_sem, &xHigherPriorityTaskWoken);
         last_press_time = now;
+        
+        // Send button press event to FSM
+        if (fsmEventQueue != NULL) {
+            FSMEvent_t event = {
+                .type = EVENT_BUTTON_PRESS,
+                .co_ppm = 0.0f
+            };
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            xQueueSendFromISR(fsmEventQueue, &event, &xHigherPriorityTaskWoken);
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        }
     }
 }
 
-// Optional to trigger manually
+// Optional to trigger manually from MQTT command
 void door_open_request(void) {
-    xSemaphoreGive(door_sem);
-}
-
-// Main door task
-static void door_task(void *arg) {
-    while (1) {
-        if (xSemaphoreTake(door_sem, portMAX_DELAY) == pdTRUE) {
-            ESP_LOGI(TAG, "Opening door");
-            door_set_angle(90);
-
-            vTaskDelay(pdMS_TO_TICKS(DOOR_OPEN_MS));
-
-            ESP_LOGI(TAG, "Closing door");
-            door_set_angle(0);
-        }
+    if (fsmEventQueue != NULL) {
+        FSMEvent_t event = {
+            .type = EVENT_BUTTON_PRESS,
+            .co_ppm = 0.0f
+        };
+        xQueueSend(fsmEventQueue, &event, 0);
     }
 }
 
@@ -110,14 +107,10 @@ void door_init(void) {
     };
     gpio_config(&btn_conf);
 
-    door_sem = xSemaphoreCreateBinary();
-
     gpio_install_isr_service(0);
     gpio_isr_handler_add(BUTTON_PIN, button_isr_handler, NULL);
 
-    xTaskCreate(door_task, "door_task", 2048, NULL, 10, NULL);
-
-    ESP_LOGI(TAG, "Door system initialized (Green LED always on)");
+    ESP_LOGI(TAG, "Door system initialized");
 }
 
 
