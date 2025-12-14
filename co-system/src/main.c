@@ -7,14 +7,17 @@
 #include "esp_timer.h"
 #include "communication/wifi_manager.h"
 #include "communication/mqtt_handler.h"
-#include "agent_task.h"
-#include "ring_buffer.h"
+#include "communication/agent_task.h"
+#include "communication/ring_buffer.h"
 #include "shared_types.h"
 
 static const char *TAG = "MAIN";
 
 // Queue for commands from MQTT (cloud -> device)
 QueueHandle_t commandQueue = NULL;
+
+// System state
+static bool system_armed = true;  // Start armed
 
 void app_main(void)
 {
@@ -46,7 +49,7 @@ void app_main(void)
 
     if (mqtt_is_connected()) {
         ESP_LOGI(TAG, "MQTT connected!");
-        mqtt_publish_status("SAFE");
+        mqtt_publish_status(0, system_armed);  // state=0 (SAFE), armed=true
     } else {
         ESP_LOGW(TAG, "MQTT connection timeout, continuing anyway...");
     }
@@ -66,6 +69,16 @@ void app_main(void)
         Command_t cmd;
         if (xQueueReceive(commandQueue, &cmd, 0) == pdTRUE) {
             switch (cmd) {
+                case CMD_ARM:
+                    ESP_LOGI(TAG, ">>> Received ARM command!");
+                    system_armed = true;
+                    mqtt_publish_status(0, system_armed);
+                    break;
+                case CMD_DISARM:
+                    ESP_LOGI(TAG, ">>> Received DISARM command!");
+                    system_armed = false;
+                    mqtt_publish_status(3, system_armed);  // state=3 (DISARMED)
+                    break;
                 case CMD_OPEN_DOOR:
                     ESP_LOGI(TAG, ">>> Received OPEN_DOOR command!");
                     // TODO: Call door_open_request() when integrated
@@ -87,10 +100,11 @@ void app_main(void)
         // In real system, alarm_task sends this via xQueueSend(telemetryQueue, ...)
         Telemetry_t test_data = {
             .timestamp = (uint32_t)(esp_timer_get_time() / 1000),
-            .co_level = test_co,
-            .state = (test_co > 35.0) ? STATE_ALARM : STATE_SAFE,
-            .state_changed = false,
-            .door_event = EVENT_NONE
+            .co_ppm = test_co,
+            .alarm_active = (test_co > 35.0),
+            .door_open = false,
+            .state = (test_co > 35.0) ? 2 : 0,  // 0=SAFE, 2=ALARM
+            .event = "READING"
         };
 
         // Send to agent_task via telemetryQueue
@@ -103,10 +117,11 @@ void app_main(void)
         if (test_co > 50.0) test_co = 10.0;
 
         // Status log
-        ESP_LOGI(TAG, "WiFi: %s | MQTT: %s | Buffer: %d | Count: %lu",
+        ESP_LOGI(TAG, "WiFi: %s | MQTT: %s | Buffer: %d | Armed: %s | Count: %lu",
                  wifi_is_connected() ? "OK" : "NO",
                  mqtt_is_connected() ? "OK" : "NO",
                  ring_buffer_count(),
+                 system_armed ? "YES" : "NO",
                  (unsigned long)counter++);
 
         vTaskDelay(pdMS_TO_TICKS(2000));

@@ -1,3 +1,11 @@
+/**
+ * mqtt_handler.c - MQTT client for cloud communication
+ *
+ * Connects to alderaan.software-engineering.ie:1883
+ * Publishes telemetry, events, status
+ * Subscribes to commands and sends parsed commands to commandQueue
+ */
+
 #include "mqtt_handler.h"
 #include "shared_types.h"
 
@@ -9,16 +17,17 @@
 #include "esp_log.h"
 #include "cJSON.h"
 
+static const char *TAG = "MQTT";
+
 // MQTT Broker configuration
-#define MQTT_BROKER_URI "mqtt://200.69.13.70:1883"
+#define MQTT_BROKER_URI  "mqtt://alderaan.software-engineering.ie:1883"
+#define MQTT_CLIENT_ID   "nonfunctionals-esp32"
 
 // MQTT Topics
 #define TOPIC_CO        "nonfunctionals/sensors/co"
 #define TOPIC_DOOR      "nonfunctionals/events/door"
 #define TOPIC_STATUS    "nonfunctionals/status"
 #define TOPIC_COMMANDS  "nonfunctionals/commands"
-
-static const char *TAG = "MQTT";
 
 // MQTT client handle
 static esp_mqtt_client_handle_t mqtt_client = NULL;
@@ -30,7 +39,6 @@ extern QueueHandle_t commandQueue;
 // Parse incoming command JSON and send to queue
 static void parse_command(const char *data, int len)
 {
-    // Null-terminate the data
     char *json_str = malloc(len + 1);
     if (!json_str) return;
     memcpy(json_str, data, len);
@@ -50,12 +58,18 @@ static void parse_command(const char *data, int len)
         Command_t cmd = CMD_NONE;
         const char *cmd_str = cmd_item->valuestring;
 
-        if (strcmp(cmd_str, "OPEN_DOOR") == 0) {
-            cmd = CMD_OPEN_DOOR;
-        } else if (strcmp(cmd_str, "RESET") == 0) {
-            cmd = CMD_RESET;
+        // Parse command string from JSON and map to Command_t enum
+        // These commands are sent from cloud dashboard to control the device
+        if (strcmp(cmd_str, "ARM") == 0) {
+            cmd = CMD_ARM;            // Enable CO monitoring
+        } else if (strcmp(cmd_str, "DISARM") == 0) {
+            cmd = CMD_DISARM;         // Disable alarms (maintenance)
         } else if (strcmp(cmd_str, "TEST") == 0) {
-            cmd = CMD_TEST;
+            cmd = CMD_TEST;           // Trigger test alarm
+        } else if (strcmp(cmd_str, "RESET") == 0) {
+            cmd = CMD_RESET;          // Clear alarm state
+        } else if (strcmp(cmd_str, "OPEN_DOOR") == 0) {
+            cmd = CMD_OPEN_DOOR;      // Open door for ventilation
         }
 
         if (cmd != CMD_NONE && commandQueue != NULL) {
@@ -78,7 +92,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "Connected to MQTT broker");
             mqtt_connected = true;
-            // Subscribe to commands topic
             esp_mqtt_client_subscribe(mqtt_client, TOPIC_COMMANDS, 1);
             ESP_LOGI(TAG, "Subscribed to %s", TOPIC_COMMANDS);
             break;
@@ -93,7 +106,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
             break;
 
         case MQTT_EVENT_DATA:
-            // Check if this is from commands topic
             if (event->topic_len > 0 && event->data_len > 0) {
                 if (strncmp(event->topic, TOPIC_COMMANDS, event->topic_len) == 0) {
                     parse_command(event->data, event->data_len);
@@ -117,14 +129,16 @@ void mqtt_init(void)
 {
     ESP_LOGI(TAG, "Initializing MQTT client...");
 
-    // Last Will Testament - published if we disconnect unexpectedly
-    const char *lwt_msg = "{\"state\":\"OFFLINE\"}";
+    const char *lwt_msg = "{\"state\":0,\"armed\":false}";
 
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker = {
             .address = {
                 .uri = MQTT_BROKER_URI,
             },
+        },
+        .credentials = {
+            .client_id = MQTT_CLIENT_ID,
         },
         .session = {
             .last_will = {
@@ -154,44 +168,58 @@ bool mqtt_is_connected(void)
     return mqtt_connected;
 }
 
-void mqtt_publish_co(float co_level, uint32_t timestamp)
+// Publish telemetry: {"co_ppm": 45.5, "timestamp": 12345, "state": 0, "alarm": false, "door": false}
+bool mqtt_publish_telemetry(float co_ppm, uint32_t timestamp, uint8_t state,
+                            bool alarm_active, bool door_open)
 {
-    if (!mqtt_connected || mqtt_client == NULL) return;
-
-    char payload[64];
-    snprintf(payload, sizeof(payload), "{\"co\":%.2f,\"ts\":%lu}", co_level, (unsigned long)timestamp);
-
-    // QoS 0 for sensor data (fire and forget)
-    esp_mqtt_client_publish(mqtt_client, TOPIC_CO, payload, 0, 0, 0);
-}
-
-void mqtt_publish_door_event(const char *event_type, float co_level, uint32_t timestamp)
-{
-    if (!mqtt_connected || mqtt_client == NULL) return;
+    if (!mqtt_connected || mqtt_client == NULL) return false;
 
     char payload[128];
-    if (co_level >= 0) {
-        // Include CO level for emergency events
-        snprintf(payload, sizeof(payload), "{\"event\":\"%s\",\"co\":%.2f,\"ts\":%lu}",
-                 event_type, co_level, (unsigned long)timestamp);
-    } else {
-        snprintf(payload, sizeof(payload), "{\"event\":\"%s\",\"ts\":%lu}",
-                 event_type, (unsigned long)timestamp);
-    }
+    snprintf(payload, sizeof(payload),
+             "{\"co_ppm\":%.2f,\"timestamp\":%lu,\"state\":%d,\"alarm\":%s,\"door\":%s}",
+             co_ppm, (unsigned long)timestamp, state,
+             alarm_active ? "true" : "false",
+             door_open ? "true" : "false");
 
-    // QoS 1 for door events (guaranteed delivery)
-    esp_mqtt_client_publish(mqtt_client, TOPIC_DOOR, payload, 0, 1, 0);
-    ESP_LOGI(TAG, "Published door event: %s", event_type);
+    int msg_id = esp_mqtt_client_publish(mqtt_client, TOPIC_CO, payload, 0, 0, 0);
+    return (msg_id >= 0);
 }
 
-void mqtt_publish_status(const char *state)
+// Publish event: {"event": "ALARM_ON", "co_ppm": 85.2, "timestamp": 12345}
+bool mqtt_publish_event(const char *event_type, float co_ppm, uint32_t timestamp)
 {
-    if (!mqtt_connected || mqtt_client == NULL) return;
+    if (!mqtt_connected || mqtt_client == NULL) return false;
+
+    char payload[128];
+    snprintf(payload, sizeof(payload),
+             "{\"event\":\"%s\",\"co_ppm\":%.2f,\"timestamp\":%lu}",
+             event_type, co_ppm, (unsigned long)timestamp);
+
+    int msg_id = esp_mqtt_client_publish(mqtt_client, TOPIC_DOOR, payload, 0, 1, 0);
+    ESP_LOGI(TAG, "Published event: %s", event_type);
+    return (msg_id >= 0);
+}
+
+// Publish status: {"state": 0, "armed": true}
+bool mqtt_publish_status(uint8_t state, bool armed)
+{
+    if (!mqtt_connected || mqtt_client == NULL) return false;
 
     char payload[64];
-    snprintf(payload, sizeof(payload), "{\"state\":\"%s\"}", state);
+    snprintf(payload, sizeof(payload),
+             "{\"state\":%d,\"armed\":%s}",
+             state, armed ? "true" : "false");
 
-    // QoS 1, retained for status
-    esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, payload, 0, 1, 1);
-    ESP_LOGI(TAG, "Published status: %s", state);
+    int msg_id = esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, payload, 0, 1, 1);
+    ESP_LOGI(TAG, "Published status: state=%d armed=%s", state, armed ? "true" : "false");
+    return (msg_id >= 0);
+}
+
+// Publish raw binary data (for teammate's protocol)
+bool mqtt_publish_raw(const char *topic, const uint8_t *data, size_t len, int qos)
+{
+    if (!mqtt_connected || mqtt_client == NULL) return false;
+
+    int msg_id = esp_mqtt_client_publish(mqtt_client, topic, (const char *)data, len, qos, 0);
+    return (msg_id >= 0);
 }
