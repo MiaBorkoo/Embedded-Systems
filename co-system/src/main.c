@@ -24,6 +24,7 @@ QueueHandle_t commandQueue = NULL;
 // System state
 static bool system_armed = true;  // Start armed
 
+#ifndef UNIT_TEST
 void app_main(void)
 {
     ESP_LOGI(TAG, "CO Safety System starting...");
@@ -134,3 +135,4 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
+#endif // UNIT_TEST

@@ -1,7 +1,16 @@
+#define UNIT_TEST 1
+
 #include <unity.h>
 #include "fsm/fsm.h"
+#include "door_task/door.h"
+#include "buzzer_task/buzzer.h"
+#include "emergency_state/emergency.h"
+#include "communication/agent_task.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
+
+static const char *TAG = "FSM_TEST";
 
 // Test: Initial state is NORMAL
 void test_initial_state(void) {
@@ -65,13 +74,33 @@ void test_button_ignored_in_emergency(void) {
 void setUp(void) {}
 void tearDown(void) {}
 
-int main(void) {
+void app_main(void) {
+    ESP_LOGI(TAG, "FSM Unit Tests Starting...");
+    
+    // Initialize required components (no WiFi/MQTT for tests)
+    agent_task_init();     // Creates telemetryQueue
+    door_init();
+    buzzer_init();
+    emergency_init();
+    fsm_init();
+    
+    // Give FSM time to initialize
+    vTaskDelay(pdMS_TO_TICKS(500));
+    
+    ESP_LOGI(TAG, "Running tests...");
     UNITY_BEGIN();
     RUN_TEST(test_initial_state);
     RUN_TEST(test_button_open_close);
     RUN_TEST(test_co_alarm_emergency);
     RUN_TEST(test_reset_from_emergency);
     RUN_TEST(test_button_ignored_in_emergency);
-    return UNITY_END();
+    UNITY_END();
+    
+    ESP_LOGI(TAG, "Tests complete!");
+    
+    // Keep task alive
+    while(1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }
 

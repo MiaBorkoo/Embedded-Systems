@@ -3,21 +3,38 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/timers.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "nvs_flash.h"
 
-#define WIFI_SSID     "iPhone (1695)"
-#define WIFI_PASSWORD "mia12345"
+#define WIFI_SSID     "Ruan's A15"
+#define WIFI_PASSWORD "odowd_A15!!!"
+#define WIFI_INIT_MAX_RETRY     3
+#define WIFI_INIT_TIMEOUT_MS    10000
+#define WIFI_RECONNECT_DELAY_MS 5000
 
 static const char *TAG = "WIFI";
-
 // Event group to signal WiFi connection status
 static EventGroupHandle_t wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 
+static TimerHandle_t reconnect_timer = NULL;
+static bool reconnect_pending = false;
+
 //All of this is based of of https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/network/esp_wifi.html
+
+// Timer callback to retry WiFi connection
+static void reconnect_timer_callback(TimerHandle_t xTimer)
+{
+    if (!wifi_is_connected() && reconnect_pending) {
+        ESP_LOGI(TAG, "Attempting WiFi reconnection...");
+        reconnect_pending = false;
+        esp_wifi_connect();
+    }
+}
+
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
@@ -25,13 +42,26 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Connecting to SSID: %s", WIFI_SSID);
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGW(TAG, "WiFi disconnected, reconnecting...");
+        ESP_LOGW(TAG, "WiFi disconnected, will retry in 5 seconds...");
         xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
-        esp_wifi_connect();
+        
+        // Schedule reconnect after 5 seconds
+        if (!reconnect_pending) {
+            reconnect_pending = true;
+            if (reconnect_timer != NULL) {
+                xTimerStart(reconnect_timer, 0);
+            }
+        }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "WiFi connected! IP: " IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        reconnect_pending = false;
+        
+        // Stop timer if running
+        if (reconnect_timer != NULL) {
+            xTimerStop(reconnect_timer, 0);
+        }
     }
 }
 
@@ -49,6 +79,15 @@ void wifi_init(void)
 
     // Create event group
     wifi_event_group = xEventGroupCreate();
+
+    // Create reconnect timer (one-shot timer)
+    reconnect_timer = xTimerCreate(
+        "wifi_reconnect",
+        pdMS_TO_TICKS(WIFI_RECONNECT_DELAY_MS),
+        pdFALSE,  // One-shot timer
+        NULL,
+        reconnect_timer_callback
+    );
 
     // Initialize TCP/IP stack
     ESP_ERROR_CHECK(esp_netif_init());
@@ -89,6 +128,31 @@ void wifi_init(void)
 
     // Start WiFi
     ESP_ERROR_CHECK(esp_wifi_start());
+
+    // Try to connect up to 3 times on init
+    bool connected = false;
+    for (int retry = 0; retry < WIFI_INIT_MAX_RETRY && !connected; retry++) {
+        ESP_LOGI(TAG, "WiFi connection attempt %d/%d", retry + 1, WIFI_INIT_MAX_RETRY);
+        
+        EventBits_t bits = xEventGroupWaitBits(
+            wifi_event_group,
+            WIFI_CONNECTED_BIT,
+            pdFALSE,
+            pdFALSE,
+            pdMS_TO_TICKS(WIFI_INIT_TIMEOUT_MS)
+        );
+
+        if (bits & WIFI_CONNECTED_BIT) {
+            connected = true;
+            ESP_LOGI(TAG, "WiFi connected successfully on attempt %d", retry + 1);
+        } else if (retry < WIFI_INIT_MAX_RETRY - 1) {
+            ESP_LOGW(TAG, "Connection timeout, retrying...");
+        }
+    }
+
+    if (!connected) {
+        ESP_LOGW(TAG, "Failed to connect after %d attempts, will retry in background", WIFI_INIT_MAX_RETRY);
+    }
 
     ESP_LOGI(TAG, "WiFi initialization complete");
 }
