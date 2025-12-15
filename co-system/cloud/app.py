@@ -22,7 +22,8 @@ device_status = {
     "state": 0,
     "armed": False,
     "last_update": None,
-    "connected": False
+    "connected": False,
+    "broker_connected": False  # Tracks MQTT broker connection (not device)
 }
 current_reading = {
     "co_ppm": 0.0,
@@ -56,6 +57,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
     print(f"[MQTT] Subscribed to topics")
     with data_lock:
         device_status["connected"] = True
+        device_status["broker_connected"] = True
 
 
 def on_disconnect(client, userdata, flags, reason_code, properties):
@@ -63,6 +65,7 @@ def on_disconnect(client, userdata, flags, reason_code, properties):
     print(f"[MQTT] Disconnected with result code: {reason_code}")
     with data_lock:
         device_status["connected"] = False
+        device_status["broker_connected"] = False
 
 
 def on_message(client, userdata, msg):
@@ -133,6 +136,9 @@ def start_mqtt():
         print("[MQTT] Client started")
     except Exception as e:
         print(f"[MQTT] Connection failed: {e}")
+        print("[MQTT] WARNING: Dashboard will not receive data or send commands!")
+        with data_lock:
+            device_status["broker_connected"] = False
 
 
 # ============== Flask Routes ==============
@@ -174,6 +180,8 @@ def get_status():
 def send_command():
     """Send command to device via MQTT"""
     data = request.get_json()
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid or missing JSON in request body"}), 400
     command = data.get("command", "").upper()
 
     valid_commands = ["ARM", "DISARM", "TEST", "RESET", "OPEN_DOOR"]
