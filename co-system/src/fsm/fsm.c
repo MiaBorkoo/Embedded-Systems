@@ -193,6 +193,16 @@ static void fsm_task(void *arg) {
 }
 
 void fsm_init(void) {
+    // Initialize LED GPIOs (centralized control)
+    gpio_config_t led_conf = {
+        .pin_bit_mask = (1ULL << GREEN_LED_PIN) | (1ULL << RED_LED_PIN),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = 0,
+        .pull_down_en = 0,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&led_conf);
+    
     // Create state mutex
     state_mutex = xSemaphoreCreateMutex();
     if (state_mutex == NULL) {

@@ -63,19 +63,6 @@ void door_open_request(void) {
 }
 
 void door_init(void) {
-
-    // GREEN LED ONLY — always ON
-    gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << GREEN_LED_PIN),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = 0,
-        .pull_down_en = 0,
-        .intr_type = GPIO_INTR_DISABLE
-    };
-    gpio_config(&io_conf);
-
-    gpio_set_level(GREEN_LED_PIN, 1);   // green LED is always ON
-
     // Servo setup
     ledc_timer_config_t servo_timer = {
         .speed_mode = LEDC_HIGH_SPEED_MODE,
