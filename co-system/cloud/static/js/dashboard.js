@@ -94,7 +94,7 @@ function initChart() {
  */
 async function fetchStatus() {
     try {
-        const response = await fetch('/api/readings');
+        const response = await fetch('/node/api/readings');
         const data = await response.json();
 
         updateDashboard(data);
@@ -106,7 +106,7 @@ async function fetchStatus() {
 
     // Also fetch device status
     try {
-        const statusResponse = await fetch('/api/status');
+        const statusResponse = await fetch('/node/api/status');
         const status = await statusResponse.json();
         updateConnectionStatus(status);
     } catch (error) {
@@ -262,7 +262,7 @@ function updateChart(readings) {
  */
 async function fetchEvents() {
     try {
-        const response = await fetch('/api/events');
+        const response = await fetch('/node/api/events');
         const data = await response.json();
         updateEventsTable(data.events);
     } catch (error) {
@@ -317,7 +317,7 @@ async function sendCommand(command) {
         feedback.className = 'mt-4 text-sm text-center text-gray-400';
         feedback.classList.remove('hidden');
 
-        const response = await fetch('/api/command', {
+        const response = await fetch('/node/api/command', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
