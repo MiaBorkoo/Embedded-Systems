@@ -140,7 +140,7 @@ bool protocol_encode_event(const Telemetry_t *telemetry,
 
     // Flags
     uint8_t flags = 0;
-    if (telemetry->alarm_active) flags |= (1 << 1);
+    if (telemetry->alarm_active) flags |= (1 << 1); 
     if (telemetry->door_open) flags |= (1 << 2);
     packet_out[idx++] = flags;
 
@@ -165,6 +165,33 @@ bool protocol_encode_event(const Telemetry_t *telemetry,
     ESP_LOGD(TAG, "Encoded event packet (%zu bytes): event='%.*s', CO=%.2f", 
              idx, (int)event_name_len, telemetry->event, telemetry->co_ppm);
 
+    return true;
+}
+
+// Encode Status Packet
+bool protocol_encode_status(const Status_t *status, uint8_t *packet_out, size_t *packet_len_out) {
+    if (!status || !packet_out || !packet_len_out) return false;
+
+    size_t idx = 0;
+    packet_out[idx++] = PROTOCOL_START_MARKER;
+    packet_out[idx++] = MSG_TYPE_STATUS;
+    uint8_t payload_length = 4; // Armed (1) + State (1) + Reserved (2)
+    packet_out[idx++] = payload_length;
+
+    packet_out[idx++] = status->armed ? 1 : 0;
+    packet_out[idx++] = status->state;
+    packet_out[idx++] = 0x00;
+    packet_out[idx++] = 0x00;
+
+    // CRC8
+    uint8_t crc = crc8_calculate(&packet_out[1], idx - 1);
+    packet_out[idx++] = crc;
+
+    // End marker
+    packet_out[idx++] = PROTOCOL_END_MARKER;
+
+    *packet_len_out = idx;
+    ESP_LOGD(TAG, "Encoded STATUS packet: armed=%d, state=%d", status->armed, status->state);
     return true;
 }
 
