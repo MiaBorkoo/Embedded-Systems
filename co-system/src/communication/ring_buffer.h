@@ -10,7 +10,7 @@ typedef struct {
     float co_ppm;
     bool alarm_active;
     bool door_open;
-    uint8_t state;          // 0=SAFE, 1=WARNING, 2=ALARM, 3=DISARMED
+    uint8_t state;
     char event[16];         // "READING", "ALARM_ON", "DOOR_OPEN", etc.
 } Telemetry_t;
 
