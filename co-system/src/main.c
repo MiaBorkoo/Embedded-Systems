@@ -32,45 +32,37 @@ void app_main(void)
     // Create command queue (for commands from cloud)
     commandQueue = xQueueCreate(10, sizeof(Command_t));
 
-    // Initialize WiFi
+    // Initialize WiFi (non-blocking - connects in background)
     wifi_init();
 
-    // Wait for WiFi to connect before starting MQTT
+    // Wait for WiFi to connect before starting MQTT (DNS resolution needs WiFi)
     ESP_LOGI(TAG, "Waiting for WiFi connection...");
-    while (!wifi_is_connected()) {
+    int wifi_wait_count = 0;
+    while (!wifi_is_connected() && wifi_wait_count < 60) {  // Wait up to 30 seconds
         vTaskDelay(pdMS_TO_TICKS(500));
+        wifi_wait_count++;
     }
-    ESP_LOGI(TAG, "WiFi connected!");
-
-    // Initialize MQTT
-    mqtt_init();
-
-    // Wait for MQTT to connect (with timeout)
-    ESP_LOGI(TAG, "Waiting for MQTT connection...");
-    int mqtt_wait = 0;
-    while (!mqtt_is_connected() && mqtt_wait < 20) {
-        vTaskDelay(pdMS_TO_TICKS(500));
-        mqtt_wait++;
-    }
-
-    if (mqtt_is_connected()) {
-        ESP_LOGI(TAG, "MQTT connected!");
-        mqtt_publish_status(0, system_armed);  // state=0 (SAFE), armed=true
+    
+    if (wifi_is_connected()) {
+        ESP_LOGI(TAG, "WiFi connected! Starting MQTT...");
+        // Initialize MQTT (now WiFi is ready for DNS resolution)
+        mqtt_init();
     } else {
-        ESP_LOGW(TAG, "MQTT connection timeout, continuing anyway...");
+        ESP_LOGW(TAG, "WiFi connection timeout - MQTT will retry when WiFi connects");
+        // MQTT will be initialized later when WiFi connects
     }
 
     // Initialize agent task (creates telemetryQueue and ring buffer)
     agent_task_init();
 
-    // Initialize hardware
+    // Initialize FSM FIRST (creates mutex and queue before high-priority tasks need them)
+    fsm_init();
+
+    // NOW initialize sensors/tasks that depend on FSM
     door_init();
     buzzer_init();
     emergency_init();
     sensor_init();
-
-    // Initialize FSM (after hardware and queues are ready)
-    fsm_init();
 
     ESP_LOGI(TAG, "All systems initialized!");
     ESP_LOGI(TAG, "Task Priorities: sensor=10, fsm=5, agent=1");

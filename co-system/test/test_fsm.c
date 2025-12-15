@@ -1,5 +1,3 @@
-#define UNIT_TEST 1
-
 #include <unity.h>
 #include "fsm/fsm.h"
 #include "door_task/door.h"

@@ -12,7 +12,7 @@
 static const char *TAG = "CO_Sensor";
 
 // CO threshold for triggering emergency
-#define CO_THRESHOLD_PPM 35.0f
+#define CO_THRESHOLD_PPM 100.0f
 
 // Convert ADC reading to CO ppm
 // Linear mapping: 0-4095 ADC -> 0-200 ppm CO

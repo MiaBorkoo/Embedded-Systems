@@ -22,6 +22,8 @@ static EventGroupHandle_t wifi_event_group;
 
 static TimerHandle_t reconnect_timer = NULL;
 static bool reconnect_pending = false;
+static int init_retry_count = 0;
+static bool init_phase = true;
 
 //All of this is based of of https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/network/esp_wifi.html
 
@@ -40,16 +42,32 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "Connecting to SSID: %s", WIFI_SSID);
+        init_retry_count = 0;
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGW(TAG, "WiFi disconnected, will retry in 5 seconds...");
         xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
         
-        // Schedule reconnect after 5 seconds
-        if (!reconnect_pending) {
-            reconnect_pending = true;
-            if (reconnect_timer != NULL) {
-                xTimerStart(reconnect_timer, 0);
+        // During init phase, retry up to 3 times quickly
+        if (init_phase && init_retry_count < WIFI_INIT_MAX_RETRY) {
+            init_retry_count++;
+            ESP_LOGW(TAG, "WiFi connection failed (attempt %d/%d), retrying...", 
+                     init_retry_count, WIFI_INIT_MAX_RETRY);
+            esp_wifi_connect();
+        } else {
+            // After init phase or max retries, switch to 5-second background retries
+            if (init_phase) {
+                ESP_LOGW(TAG, "Initial connection attempts exhausted, switching to 5s retry cycle");
+                init_phase = false;
+            } else {
+                ESP_LOGW(TAG, "WiFi disconnected, will retry in 5 seconds...");
+            }
+            
+            // Schedule reconnect after 5 seconds
+            if (!reconnect_pending) {
+                reconnect_pending = true;
+                if (reconnect_timer != NULL) {
+                    xTimerStart(reconnect_timer, 0);
+                }
             }
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -57,6 +75,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "WiFi connected! IP: " IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
         reconnect_pending = false;
+        init_phase = false;  // Successfully connected, exit init phase
         
         // Stop timer if running
         if (reconnect_timer != NULL) {
@@ -119,42 +138,17 @@ void wifi_init(void)
         .sta = {
             .ssid = WIFI_SSID,
             .password = WIFI_PASSWORD,
-            .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+            .threshold.authmode = WIFI_AUTH_OPEN,  // Accept any auth mode for Android compatibility
         },
     };
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
 
-    // Start WiFi
+    // Start WiFi (non-blocking - connection happens in background)
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    // Try to connect up to 3 times on init
-    bool connected = false;
-    for (int retry = 0; retry < WIFI_INIT_MAX_RETRY && !connected; retry++) {
-        ESP_LOGI(TAG, "WiFi connection attempt %d/%d", retry + 1, WIFI_INIT_MAX_RETRY);
-        
-        EventBits_t bits = xEventGroupWaitBits(
-            wifi_event_group,
-            WIFI_CONNECTED_BIT,
-            pdFALSE,
-            pdFALSE,
-            pdMS_TO_TICKS(WIFI_INIT_TIMEOUT_MS)
-        );
-
-        if (bits & WIFI_CONNECTED_BIT) {
-            connected = true;
-            ESP_LOGI(TAG, "WiFi connected successfully on attempt %d", retry + 1);
-        } else if (retry < WIFI_INIT_MAX_RETRY - 1) {
-            ESP_LOGW(TAG, "Connection timeout, retrying...");
-        }
-    }
-
-    if (!connected) {
-        ESP_LOGW(TAG, "Failed to connect after %d attempts, will retry in background", WIFI_INIT_MAX_RETRY);
-    }
-
-    ESP_LOGI(TAG, "WiFi initialization complete");
+    ESP_LOGI(TAG, "WiFi initialization complete (connecting in background)");
 }
 
 bool wifi_is_connected(void)
