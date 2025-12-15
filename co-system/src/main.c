@@ -99,16 +99,6 @@ void app_main(void)
                         xQueueSend(fsmEventQueue, &event, 0);
                     }
                     break;
-                case CMD_TEST:
-                    ESP_LOGI(TAG, ">>> Received TEST command!");
-                    if (fsmEventQueue != NULL) {
-                        FSMEvent_t event = {
-                            .type = EVENT_CMD_TEST,
-                            .co_ppm = 0.0f
-                        };
-                        xQueueSend(fsmEventQueue, &event, 0);
-                    }
-                    break;
                 default:
                     break;
             }

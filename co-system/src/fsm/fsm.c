@@ -107,7 +107,6 @@ static void handle_event(FSMEvent_t *event) {
                     next_state = STATE_OPEN;
                     break;
                 case EVENT_CO_ALARM:
-                case EVENT_CMD_TEST:
                     next_state = STATE_EMERGENCY;
                     break;
                 case EVENT_CMD_RESET:
@@ -122,7 +121,6 @@ static void handle_event(FSMEvent_t *event) {
                     // Button allowed in OPEN, but already open - ignore
                     break;
                 case EVENT_CO_ALARM:
-                case EVENT_CMD_TEST:
                     next_state = STATE_EMERGENCY;
                     break;
                 case EVENT_CMD_RESET:
@@ -138,7 +136,6 @@ static void handle_event(FSMEvent_t *event) {
                     ESP_LOGW(TAG, "Button press ignored in EMERGENCY state");
                     break;
                 case EVENT_CO_ALARM:
-                case EVENT_CMD_TEST:
                     // Already in emergency, update CO reading
                     ESP_LOGI(TAG, "Still in EMERGENCY (CO=%.1f ppm)", event->co_ppm);
                     break;

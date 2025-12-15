@@ -36,8 +36,8 @@ void test_co_alarm_emergency(void) {
 
 // Test: CMD_RESET exits EMERGENCY
 void test_reset_from_emergency(void) {
-    // First trigger emergency
-    FSMEvent_t alarm = {.type = EVENT_CMD_TEST, .co_ppm = 0.0f};
+    // First trigger emergency with realistic CO alarm
+    FSMEvent_t alarm = {.type = EVENT_CO_ALARM, .co_ppm = 50.0f};
     xQueueSend(fsmEventQueue, &alarm, 0);
     vTaskDelay(pdMS_TO_TICKS(100));
     TEST_ASSERT_EQUAL(STATE_EMERGENCY, fsm_get_state());
@@ -51,8 +51,8 @@ void test_reset_from_emergency(void) {
 
 // Test: Button ignored in EMERGENCY state
 void test_button_ignored_in_emergency(void) {
-    // Trigger emergency
-    FSMEvent_t alarm = {.type = EVENT_CMD_TEST, .co_ppm = 0.0f};
+    // Trigger emergency with realistic CO alarm
+    FSMEvent_t alarm = {.type = EVENT_CO_ALARM, .co_ppm = 50.0f};
     xQueueSend(fsmEventQueue, &alarm, 0);
     vTaskDelay(pdMS_TO_TICKS(100));
     TEST_ASSERT_EQUAL(STATE_EMERGENCY, fsm_get_state());
