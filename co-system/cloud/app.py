@@ -238,4 +238,4 @@ if __name__ == "__main__":
         print("\n[NGROK] Skipping tunnel creation - no auth token\n")
 
     # Run Flask (debug=False for production on alderaan)
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False)
