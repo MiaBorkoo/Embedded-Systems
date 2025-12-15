@@ -14,6 +14,10 @@ import json
 import os
 import paho.mqtt.client as mqtt
 from pyngrok import ngrok
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -133,6 +137,16 @@ mqtt_client.on_message = on_message
 def start_mqtt():
     """Start MQTT client in background thread"""
     try:
+        # Get MQTT credentials from environment variables
+        mqtt_username = os.getenv("MQTT_USERNAME")
+        mqtt_password = os.getenv("MQTT_PASSWORD")
+        
+        if mqtt_username and mqtt_password:
+            mqtt_client.username_pw_set(mqtt_username, mqtt_password)
+            print("[MQTT] Using credentials from environment")
+        else:
+            print("[MQTT] No credentials set - connecting anonymously")
+        
         mqtt_client.connect("localhost", 1883, 60)
         mqtt_client.loop_start()
         print("[MQTT] Client started")
