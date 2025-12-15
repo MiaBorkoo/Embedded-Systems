@@ -5,6 +5,13 @@
 #include <stdint.h>
 #include <stddef.h>
 
+// MQTT Topics
+#define TOPIC_CO        "nonfunctionals/sensors/co"
+#define TOPIC_DOOR      "nonfunctionals/events/door"
+#define TOPIC_STATUS    "nonfunctionals/status"
+#define TOPIC_COMMANDS  "nonfunctionals/commands"
+
+
 void mqtt_init(void);
 bool mqtt_is_connected(void);
 

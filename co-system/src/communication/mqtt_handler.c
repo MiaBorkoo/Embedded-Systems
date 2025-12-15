@@ -23,12 +23,6 @@ static const char *TAG = "MQTT";
 #define MQTT_BROKER_URI  "mqtt://alderaan.software-engineering.ie:1883"
 #define MQTT_CLIENT_ID   "nonfunctionals-esp32"
 
-// MQTT Topics
-#define TOPIC_CO        "nonfunctionals/sensors/co"
-#define TOPIC_DOOR      "nonfunctionals/events/door"
-#define TOPIC_STATUS    "nonfunctionals/status"
-#define TOPIC_COMMANDS  "nonfunctionals/commands"
-
 // MQTT client handle
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 static bool mqtt_connected = false;

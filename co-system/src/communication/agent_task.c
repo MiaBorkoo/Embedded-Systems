@@ -21,6 +21,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
+#include "protocol.h"
 
 static const char *TAG = "AGENT";
 
@@ -28,19 +29,54 @@ static const char *TAG = "AGENT";
 QueueHandle_t telemetryQueue = NULL;
 
 // Publish Telemetry_t to MQTT using new API
-static void publish_telemetry(Telemetry_t *data)
-{
-    // Publish full telemetry
-    mqtt_publish_telemetry(data->co_ppm, data->timestamp, data->state,
-                           data->alarm_active, data->door_open);
-
-    // Publish event if not just a regular reading
-    if (strcmp(data->event, "READING") != 0) {
-        mqtt_publish_event(data->event, data->co_ppm, data->timestamp);
+static void publish_telemetry(const Telemetry_t *telemetry) {
+    if (!telemetry) {
+        return;
     }
 
-    ESP_LOGI(TAG, "Published: co=%.1f state=%d event=%s",
-             data->co_ppm, data->state, data->event);
+    // Always publish telemetry packet
+    uint8_t telemetry_packet[PROTOCOL_MAX_PACKET_SIZE];
+    size_t telemetry_len = 0;
+
+    if (protocol_encode_telemetry(telemetry, telemetry_packet, &telemetry_len)) {
+        // Publish binary packet to MQTT
+        bool success = mqtt_publish_raw(
+            TOPIC_CO,                    // Topic
+            telemetry_packet,            // Binary data
+            telemetry_len,               // Length
+            0                            // QoS 0
+        );
+
+        if (success) {
+            ESP_LOGD(TAG, "Published telemetry packet (%zu bytes)", telemetry_len);
+            protocol_print_packet(telemetry_packet, telemetry_len, TAG);  // Debug
+        } else {
+            ESP_LOGW(TAG, "Failed to publish telemetry packet");
+        }
+    }
+
+    // If this is an event (not just "READING"), also send event packet
+    if (strncmp(telemetry->event, "READING", sizeof(telemetry->event)) != 0) {
+        uint8_t event_packet[PROTOCOL_MAX_PACKET_SIZE];
+        size_t event_len = 0;
+
+        if (protocol_encode_event(telemetry, event_packet, &event_len)) {
+            bool success = mqtt_publish_raw(
+                TOPIC_STATUS,            // Or TOPIC_DOOR for door events
+                event_packet,
+                event_len,
+                1                        // QoS 1 for events
+            );
+
+            if (success) {
+                ESP_LOGD(TAG, "Published event packet: %s (%zu bytes)", 
+                         telemetry->event, event_len);
+                protocol_print_packet(event_packet, event_len, TAG);
+            } else {
+                ESP_LOGW(TAG, "Failed to publish event packet");
+            }
+        }
+    }
 }
 
 // Flush all buffered data to MQTT when reconnected
