@@ -137,17 +137,20 @@ mqtt_client.on_message = on_message
 def start_mqtt():
     """Start MQTT client in background thread"""
     try:
-        # Get MQTT credentials from environment variables
+        # Get MQTT configuration from environment variables
+        mqtt_broker = os.getenv("MQTT_BROKER", "localhost")
+        mqtt_port = int(os.getenv("MQTT_PORT", "1883"))
         mqtt_username = os.getenv("MQTT_USERNAME")
         mqtt_password = os.getenv("MQTT_PASSWORD")
         
         if mqtt_username and mqtt_password:
             mqtt_client.username_pw_set(mqtt_username, mqtt_password)
-            print("[MQTT] Using credentials from environment")
+            print(f"[MQTT] Using credentials from environment")
         else:
             print("[MQTT] No credentials set - connecting anonymously")
         
-        mqtt_client.connect("localhost", 1883, 60)
+        print(f"[MQTT] Connecting to {mqtt_broker}:{mqtt_port}")
+        mqtt_client.connect(mqtt_broker, mqtt_port, 60)
         mqtt_client.loop_start()
         print("[MQTT] Client started")
     except Exception as e:
