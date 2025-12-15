@@ -64,8 +64,6 @@ static void parse_command(const char *data, int len)
             cmd = CMD_ARM;            // Enable CO monitoring
         } else if (strcmp(cmd_str, "DISARM") == 0) {
             cmd = CMD_DISARM;         // Disable alarms (maintenance)
-        } else if (strcmp(cmd_str, "TEST") == 0) {
-            cmd = CMD_TEST;           // Trigger test alarm
         } else if (strcmp(cmd_str, "RESET") == 0) {
             cmd = CMD_RESET;          // Clear alarm state
         } else if (strcmp(cmd_str, "OPEN_DOOR") == 0) {

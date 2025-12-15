@@ -11,6 +11,5 @@
 void door_init(void);
 void door_open_request(void);  
 void door_set_angle(uint32_t angle);
-void door_set_green_led(bool on);
 
 #endif // DOOR_H
