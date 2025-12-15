@@ -27,6 +27,11 @@ static SemaphoreHandle_t state_mutex = NULL;
 
 // Get current state (thread-safe)
 SystemState_t fsm_get_state(void) {
+    // Handle case where FSM not yet initialized
+    if (state_mutex == NULL) {
+        return STATE_NORMAL;  // Return default state if FSM not ready
+    }
+    
     SystemState_t state;
     xSemaphoreTake(state_mutex, portMAX_DELAY);
     state = current_state;
