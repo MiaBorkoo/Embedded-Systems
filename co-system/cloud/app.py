@@ -11,7 +11,9 @@ from collections import deque
 from datetime import datetime
 import threading
 import json
+import os
 import paho.mqtt.client as mqtt
+from pyngrok import ngrok
 
 app = Flask(__name__)
 
@@ -213,8 +215,27 @@ if __name__ == "__main__":
     print("Team: The Non-Functionals")
     print("=" * 50)
 
+    # Get ngrok auth token from environment variable
+    # Set it with: export NGROK_AUTH_TOKEN="your_token_here"
+    # Get token from: https://dashboard.ngrok.com/get-started/your-authtoken
+    NGROK_AUTH_TOKEN = os.getenv("NGROK_AUTH_TOKEN")
+    
+    if NGROK_AUTH_TOKEN:
+        ngrok.set_auth_token(NGROK_AUTH_TOKEN)
+        print("[NGROK] Auth token set from environment")
+    else:
+        print("[NGROK] WARNING: No NGROK_AUTH_TOKEN environment variable set")
+        print("[NGROK] Set it with: export NGROK_AUTH_TOKEN='your_token_here'")
+
     # Start MQTT in background
     start_mqtt()
+
+    # Start ngrok tunnel (if token is set)
+    if NGROK_AUTH_TOKEN:
+        public_url = ngrok.connect(5000)
+        print(f"Public URL: {public_url}")
+    else:
+        print("\n[NGROK] Skipping tunnel creation - no auth token\n")
 
     # Run Flask (debug=False for production on alderaan)
     app.run(host="0.0.0.0", port=5000, debug=True)
