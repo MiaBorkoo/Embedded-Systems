@@ -28,7 +28,7 @@ app = Flask(__name__)
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,  # Change to DEBUG for more verbose output
+    level=logging.INFO,  
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)

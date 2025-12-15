@@ -16,6 +16,7 @@ idf_component_register(
         "communication/ring_buffer.c"
         "communication/crc8.c"
         "communication/protocol.c"
+        "communication/protocol_types.h"
 
     INCLUDE_DIRS
         "../include"

@@ -3,6 +3,7 @@
 #include <string.h>
 #include "esp_log.h"
 #include <stdio.h>
+#include "protocol_types.h"  
 
 static const char *TAG = "PROTOCOL";
 

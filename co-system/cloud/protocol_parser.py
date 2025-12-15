@@ -8,10 +8,9 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
-# Protocol constants (must match ESP32 definitions)
+# Protocol constants 
 PROTOCOL_START_MARKER = 0xAA
 PROTOCOL_END_MARKER = 0x55
 
@@ -80,9 +79,9 @@ def verify_packet(packet: bytes) -> bool:
         logger.warning(f"Invalid end marker: 0x{packet[-1]:02X}")
         return False
     
-    # Verify CRC8
+    #verifies CRC
     received_crc = packet[-2]
-    # Calculate CRC on everything except start marker and last 2 bytes (CRC + END)
+    #calculate CRC on everything except start marker and last 2 bytes (CRC + END)
     calculated_crc = crc8_calculate(packet[1:-2])
     
     if received_crc != calculated_crc:
@@ -145,8 +144,8 @@ def parse_telemetry_packet(packet: bytes) -> Optional[Dict[str, Any]]:
         
         # Parse flags byte
         flags = payload[6]
-        alarm_active = bool(flags & 0x02)  # Bit 1
-        door_open = bool(flags & 0x04)     # Bit 2
+        alarm_active = bool(flags & 0x02)  #Bit 1
+        door_open = bool(flags & 0x04)     #Bit 2
         
         # Parse state
         state = payload[7]
@@ -158,7 +157,7 @@ def parse_telemetry_packet(packet: bytes) -> Optional[Dict[str, Any]]:
         
         result = {
             "timestamp": timestamp,
-            "co_ppm": round(co_ppm, 2),  # Round to 2 decimal places
+            "co_ppm": round(co_ppm, 2),  #rounds to 2 decimal places
             "alarm_active": alarm_active,
             "door_open": door_open,
             "state": state,
@@ -206,9 +205,6 @@ def parse_event_packet(packet: bytes) -> Optional[Dict[str, Any]]:
     - Flags (1 byte)
     - State (1 byte)
     - Reserved (2 bytes)
-    
-    Args:
-        packet: Raw packet bytes
         
     Returns:
         Dictionary with parsed data, or None if parsing fails
@@ -284,16 +280,6 @@ def parse_event_packet(packet: bytes) -> Optional[Dict[str, Any]]:
 
 
 def parse_packet(packet: bytes) -> Optional[Dict[str, Any]]:
-    """
-    Main entry point: Parse any binary packet
-    Automatically detects packet type and routes to appropriate parser
-    
-    Args:
-        packet: Raw packet bytes
-        
-    Returns:
-        Dictionary with parsed data, or None if parsing fails
-    """
     if len(packet) < 6:
         logger.warning(f"Packet too short: {len(packet)} bytes")
         return None
@@ -322,12 +308,6 @@ def parse_packet(packet: bytes) -> Optional[Dict[str, Any]]:
 
 
 def print_packet_breakdown(packet: bytes):
-    """
-    Debug helper: Print detailed packet breakdown
-    
-    Args:
-        packet: Raw packet bytes
-    """
     print(f"\n{'='*60}")
     print(f"PACKET BREAKDOWN ({len(packet)} bytes)")
     print(f"{'='*60}")
