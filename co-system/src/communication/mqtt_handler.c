@@ -138,11 +138,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     }
 }
 
+// Pre-encoded binary LWT status packet (offline status)
+static uint8_t lwt_packet[16];
+static size_t lwt_packet_len = 0;
+
 void mqtt_init(void)
 {
     ESP_LOGI(TAG, "Initializing MQTT client...");
 
-    const char *lwt_msg = "{\"state\":0,\"armed\":false}";
+    // Build binary LWT packet using protocol encoder
+    Status_t offline_status = { .armed = false, .state = 0 };
+    protocol_encode_status(&offline_status, lwt_packet, &lwt_packet_len);
 
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker = {
@@ -156,8 +162,8 @@ void mqtt_init(void)
         .session = {
             .last_will = {
                 .topic = TOPIC_STATUS,
-                .msg = lwt_msg,
-                .msg_len = strlen(lwt_msg),
+                .msg = (const char *)lwt_packet,
+                .msg_len = lwt_packet_len,
                 .qos = 1,
                 .retain = true,
             },
@@ -181,54 +187,7 @@ bool mqtt_is_connected(void)
     return mqtt_connected;
 }
 
-// Publish telemetry: {"co_ppm": 45.5, "timestamp": 12345, "state": 0, "alarm": false, "door": false}
-bool mqtt_publish_telemetry(float co_ppm, uint32_t timestamp, uint8_t state,
-                            bool alarm_active, bool door_open)
-{
-    if (!mqtt_connected || mqtt_client == NULL) return false;
-
-    char payload[128];
-    snprintf(payload, sizeof(payload),
-             "{\"co_ppm\":%.2f,\"timestamp\":%lu,\"state\":%d,\"alarm\":%s,\"door\":%s}",
-             co_ppm, (unsigned long)timestamp, state,
-             alarm_active ? "true" : "false",
-             door_open ? "true" : "false");
-
-    int msg_id = esp_mqtt_client_publish(mqtt_client, TOPIC_CO, payload, 0, 0, 0);
-    return (msg_id >= 0);
-}
-
-// Publish event: {"event": "ALARM_ON", "co_ppm": 85.2, "timestamp": 12345}
-bool mqtt_publish_event(const char *event_type, float co_ppm, uint32_t timestamp)
-{
-    if (!mqtt_connected || mqtt_client == NULL) return false;
-
-    char payload[128];
-    snprintf(payload, sizeof(payload),
-             "{\"event\":\"%s\",\"co_ppm\":%.2f,\"timestamp\":%lu}",
-             event_type, co_ppm, (unsigned long)timestamp);
-
-    int msg_id = esp_mqtt_client_publish(mqtt_client, TOPIC_DOOR, payload, 0, 1, 0);
-    ESP_LOGI(TAG, "Published event: %s", event_type);
-    return (msg_id >= 0);
-}
-
-// Publish status: {"state": 0, "armed": true}
-bool mqtt_publish_status(uint8_t state, bool armed)
-{
-    if (!mqtt_connected || mqtt_client == NULL) return false;
-
-    char payload[64];
-    snprintf(payload, sizeof(payload),
-             "{\"state\":%d,\"armed\":%s}",
-             state, armed ? "true" : "false");
-
-    int msg_id = esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, payload, 0, 1, 1);
-    ESP_LOGI(TAG, "Published status: state=%d armed=%s", state, armed ? "true" : "false");
-    return (msg_id >= 0);
-}
-
-// Publish raw binary data (for teammate's protocol)
+// Publish raw binary data using protocol
 bool mqtt_publish_raw(const char *topic, const uint8_t *data, size_t len, int qos)
 {
     if (!mqtt_connected || mqtt_client == NULL) return false;
