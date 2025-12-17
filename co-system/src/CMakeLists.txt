@@ -17,6 +17,7 @@ idf_component_register(
         "communication/crc8.c"
         "communication/protocol.c"
         "communication/protocol_types.h"
+        "communication/ifttt_webhook.c"
         "fsm/fsm.c"
         "stats/stats.c"
 
@@ -31,4 +32,7 @@ idf_component_register(
         "door_task"
         "buzzer_task"
         "fsm"
+
+    REQUIRES
+        esp_http_client
 )
