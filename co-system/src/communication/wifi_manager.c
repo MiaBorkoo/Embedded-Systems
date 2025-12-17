@@ -9,8 +9,8 @@
 #include "esp_event.h"
 #include "nvs_flash.h"
 
-#define WIFI_SSID     "Alisia"
-#define WIFI_PASSWORD "iamgreat2104"
+#define WIFI_SSID     "Ruan's A15"
+#define WIFI_PASSWORD "odowd_A15!!!"
 #define WIFI_INIT_MAX_RETRY     3
 #define WIFI_INIT_TIMEOUT_MS    10000
 #define WIFI_RECONNECT_DELAY_MS 5000
@@ -138,7 +138,7 @@ void wifi_init(void)
         .sta = {
             .ssid = WIFI_SSID,
             .password = WIFI_PASSWORD,
-            .threshold.authmode = WIFI_AUTH_WPA2_PSK,  // Accept any auth mode for Android compatibility
+            .threshold.authmode = WIFI_AUTH_OPEN,  
         },
     };
 
