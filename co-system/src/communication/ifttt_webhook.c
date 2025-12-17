@@ -58,8 +58,7 @@ static void send_webhook_post(void)
         .method = HTTP_METHOD_POST,
         .event_handler = http_event_handler,
         .timeout_ms = IFTTT_TIMEOUT_MS,
-        .skip_cert_common_name_check = true,  // Skip HTTPS verification
-        .transport_type = HTTP_TRANSPORT_OVER_SSL,
+        .is_async = false,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
