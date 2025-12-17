@@ -22,9 +22,8 @@ MSG_TYPE_STATUS = 0x03
 # Command IDs (for building command packets)
 CMD_ARM = 0x01
 CMD_DISARM = 0x02
-CMD_TEST = 0x03
-CMD_RESET = 0x04
-CMD_OPEN_DOOR = 0x05
+CMD_RESET = 0x03
+CMD_OPEN_DOOR = 0x04
 
 
 def crc8_calculate(data: bytes) -> int:
