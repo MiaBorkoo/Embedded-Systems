@@ -182,9 +182,41 @@ def get_readings():
 
 @app.route("/api/events")
 def get_events():
-    """Return recent events"""
+    """Return recent events with pagination"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    # Clamp per_page to reasonable limits
+    per_page = max(5, min(per_page, 50))
+
     with data_lock:
-        return jsonify({"events": list(events)})
+        all_events = list(events)
+
+    # Reverse to show newest first
+    all_events = all_events[::-1]
+
+    total = len(all_events)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+
+    # Clamp page to valid range
+    page = max(1, min(page, total_pages))
+
+    # Slice for current page
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_events = all_events[start:end]
+
+    return jsonify({
+        "events": page_events,
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "total_pages": total_pages,
+            "has_prev": page > 1,
+            "has_next": page < total_pages
+        }
+    })
 
 
 @app.route("/api/status")
@@ -249,5 +281,5 @@ if __name__ == "__main__":
     # Start MQTT in background
     start_mqtt()
 
-    # Run Flask (debug=False for production on alderaan)
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    # Run Flask (debug=False to prevent MQTT double-connection from reloader)
+    app.run(host="0.0.0.0", port=8080, debug=False)

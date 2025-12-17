@@ -11,6 +11,10 @@ const CO_MAX_DISPLAY = 150;
 // Chart instance
 let coChart = null;
 
+// Pagination state
+let currentEventsPage = 1;
+const eventsPerPage = 10;
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initChart();
@@ -266,41 +270,43 @@ function updateChart(readings) {
 }
 
 /**
- * Fetch recent events
+ * Fetch recent events with pagination
  */
-async function fetchEvents() {
+async function fetchEvents(page = currentEventsPage) {
     try {
-        const response = await fetch('/node/api/events');
+        const response = await fetch(`/node/api/events?page=${page}&per_page=${eventsPerPage}`);
         const data = await response.json();
-        updateEventsTable(data.events);
+        currentEventsPage = data.pagination.page;
+        updateEventsTable(data.events, data.pagination);
     } catch (error) {
         console.error('Error fetching events:', error);
     }
 }
 
 /**
- * Update events table
+ * Update events table with pagination
  */
-function updateEventsTable(events) {
+function updateEventsTable(events, pagination) {
     const tbody = document.getElementById('events-table');
+    const paginationEl = document.getElementById('events-pagination');
 
     if (!events || events.length === 0) {
         tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-500">No events yet</td></tr>';
+        if (paginationEl) paginationEl.innerHTML = '';
         return;
     }
 
-    // Show most recent first, limit to 20
-    const recentEvents = events.slice(-20).reverse();
-
-    tbody.innerHTML = recentEvents.map(event => {
+    // Events already sorted by API (newest first)
+    tbody.innerHTML = events.map(event => {
         const time = new Date(event.received_at).toLocaleTimeString();
         const eventType = event.event || 'UNKNOWN';
 
         // Determine badge class
         let badgeClass = 'event-normal';
-        if (eventType.includes('ALARM')) badgeClass = 'event-alarm';
-        else if (eventType.includes('DOOR')) badgeClass = 'event-door';
+        if (eventType.includes('ALARM') || eventType.includes('EMERGENCY')) badgeClass = 'event-alarm';
+        else if (eventType.includes('DOOR') || eventType.includes('OPEN')) badgeClass = 'event-door';
         else if (eventType.includes('CMD')) badgeClass = 'event-cmd';
+        else if (eventType.includes('NORMAL')) badgeClass = 'event-normal';
 
         return `
             <tr class="border-b border-gray-700">
@@ -312,6 +318,45 @@ function updateEventsTable(events) {
             </tr>
         `;
     }).join('');
+
+    // Update pagination controls
+    if (paginationEl && pagination) {
+        paginationEl.innerHTML = `
+            <div class="flex items-center justify-between mt-4 text-sm">
+                <span class="text-gray-400">
+                    Page ${pagination.page} of ${pagination.total_pages} (${pagination.total} events)
+                </span>
+                <div class="flex gap-2">
+                    <button onclick="prevEventsPage()"
+                            class="px-3 py-1 rounded ${pagination.has_prev ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}"
+                            ${pagination.has_prev ? '' : 'disabled'}>
+                        Prev
+                    </button>
+                    <button onclick="nextEventsPage()"
+                            class="px-3 py-1 rounded ${pagination.has_next ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}"
+                            ${pagination.has_next ? '' : 'disabled'}>
+                        Next
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Navigate to previous events page
+ */
+function prevEventsPage() {
+    if (currentEventsPage > 1) {
+        fetchEvents(currentEventsPage - 1);
+    }
+}
+
+/**
+ * Navigate to next events page
+ */
+function nextEventsPage() {
+    fetchEvents(currentEventsPage + 1);
 }
 
 /**
