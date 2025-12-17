@@ -18,6 +18,8 @@ idf_component_register(
         "communication/protocol.c"
         "communication/protocol_types.h"
         "fsm/fsm.c"
+        "stats/stats.c"
+
 
     INCLUDE_DIRS
         "../include"

@@ -23,6 +23,7 @@
 #include "freertos/queue.h"
 #include "esp_log.h"
 #include "protocol.h"
+#include "stats/stats.h"
 
 static const char *TAG = "AGENT";
 
@@ -49,9 +50,11 @@ static void publish_telemetry(const Telemetry_t *telemetry) {
         );
 
         if (success) {
+            stats_record_telemetry_sent();
             ESP_LOGD(TAG, "Published telemetry packet (%zu bytes)", telemetry_len);
-            protocol_print_packet(telemetry_packet, telemetry_len, TAG);  // Debug
+           // protocol_print_packet(telemetry_packet, telemetry_len, TAG);  // Debug
         } else {
+            stats_record_telemetry_buffered();
             ESP_LOGW(TAG, "Failed to publish telemetry packet");
         }
     }
@@ -70,9 +73,10 @@ static void publish_telemetry(const Telemetry_t *telemetry) {
             );
 
             if (success) {
+                stats_record_event_sent();
                 ESP_LOGD(TAG, "Published event packet: %s (%zu bytes)", 
                          telemetry->event, event_len);
-                protocol_print_packet(event_packet, event_len, TAG);
+                //protocol_print_packet(event_packet, event_len, TAG);  //debug
             } else {
                 ESP_LOGW(TAG, "Failed to publish event packet");
             }
