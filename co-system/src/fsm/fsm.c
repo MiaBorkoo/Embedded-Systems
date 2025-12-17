@@ -123,8 +123,8 @@ static void handle_event(FSMEvent_t *event) {
                     // CO alarm immediately transitions to emergency
                     next_state = STATE_EMERGENCY;
                     break;
-                case EVENT_CMD_RESET:
-                    // Reset ignored during initialization
+                case EVENT_CMD_STOP_EMER:
+                    // Stop emergency command ignored during initialization
                     break;
             }
             break;

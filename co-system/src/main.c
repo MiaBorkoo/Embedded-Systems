@@ -21,9 +21,6 @@ static const char *TAG = "MAIN";
 // Queue for commands from MQTT (cloud -> device)
 QueueHandle_t commandQueue = NULL;
 
-// System state
-static bool system_armed = true;  // Start armed
-
 #ifndef UNIT_TEST
 void app_main(void)
 {
