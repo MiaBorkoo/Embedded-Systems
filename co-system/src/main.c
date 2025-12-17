@@ -15,6 +15,7 @@
 #include "buzzer_task/buzzer.h"
 #include "emergency_state/emergency.h"
 #include "sensor_task/sensor.h"
+#include "stats/stats.h"
 
 static const char *TAG = "MAIN";
 
@@ -63,6 +64,7 @@ void app_main(void)
     buzzer_init();
     emergency_init();
     sensor_init();
+    stats_task_init();
 
     ESP_LOGI(TAG, "All systems initialized!");
     ESP_LOGI(TAG, "Task Priorities: sensor=10, fsm=5, agent=1");
