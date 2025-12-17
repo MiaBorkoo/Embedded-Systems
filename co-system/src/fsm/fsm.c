@@ -20,6 +20,9 @@ QueueHandle_t fsmEventQueue = NULL;
 static SystemState_t current_state = STATE_INIT;
 static SemaphoreHandle_t state_mutex = NULL;
 
+// Last known CO reading (updated by sensor events, used for all telemetry)
+static float last_known_co = 0.0f;
+
 // Get current state (thread-safe)
 SystemState_t fsm_get_state(void) {
     // Handle case where FSM not yet initialized
@@ -103,7 +106,12 @@ static void apply_state_config(SystemState_t state, float co_ppm) {
 static void handle_event(FSMEvent_t *event) {
     SystemState_t prev_state = fsm_get_state();
     SystemState_t next_state = prev_state;
-    
+
+    // Update last known CO if this event has a valid reading
+    if (event->co_ppm > 0.0f) {
+        last_known_co = event->co_ppm;
+    }
+
     switch (prev_state) {
         case STATE_INIT:
             switch (event->type) {
@@ -120,7 +128,7 @@ static void handle_event(FSMEvent_t *event) {
                     break;
             }
             break;
-            
+
         case STATE_NORMAL:
             switch (event->type) {
                 case EVENT_BUTTON_PRESS:
@@ -134,7 +142,7 @@ static void handle_event(FSMEvent_t *event) {
                     break;
             }
             break;
-            
+
         case STATE_OPEN:
             switch (event->type) {
                 case EVENT_BUTTON_PRESS:
@@ -148,7 +156,7 @@ static void handle_event(FSMEvent_t *event) {
                     break;
             }
             break;
-            
+
         case STATE_EMERGENCY:
             switch (event->type) {
                 case EVENT_BUTTON_PRESS:
@@ -165,11 +173,11 @@ static void handle_event(FSMEvent_t *event) {
             }
             break;
     }
-    
-    // Apply state transition
+
+    // Apply state transition using last known CO (not event's CO which may be 0)
     if (next_state != prev_state) {
         fsm_set_state(next_state);
-        apply_state_config(next_state, event->co_ppm);
+        apply_state_config(next_state, last_known_co);
     }
 }
 
@@ -216,18 +224,18 @@ static void fsm_task(void *arg) {
             if (elapsed >= INIT_DURATION_MS) {
                 ESP_LOGI(TAG, "Init timer expired, transitioning to NORMAL");
                 fsm_set_state(STATE_NORMAL);
-                apply_state_config(STATE_NORMAL, 0.0f);
+                apply_state_config(STATE_NORMAL, last_known_co);
                 init_timer_active = false;
             }
         }
-        
+
         // Handle door auto-close timer
         if (door_timer_active && fsm_get_state() == STATE_OPEN) {
             TickType_t elapsed = (xTaskGetTickCount() - door_close_time) * portTICK_PERIOD_MS;
             if (elapsed >= DOOR_OPEN_DURATION_MS) {
                 ESP_LOGI(TAG, "Door timer expired, returning to NORMAL");
                 fsm_set_state(STATE_NORMAL);
-                apply_state_config(STATE_NORMAL, 0.0f);
+                apply_state_config(STATE_NORMAL, last_known_co);
                 door_timer_active = false;
             }
         }
