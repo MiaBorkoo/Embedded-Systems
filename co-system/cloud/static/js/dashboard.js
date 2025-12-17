@@ -5,8 +5,8 @@
 
 // CO Thresholds (ppm)
 const CO_WARNING = 35;
-const CO_DANGER = 70;
-const CO_MAX_DISPLAY = 100;
+const CO_DANGER = 100;
+const CO_MAX_DISPLAY = 150;
 
 // Chart instance
 let coChart = null;
@@ -64,12 +64,15 @@ function initChart() {
                 y: {
                     display: true,
                     min: 0,
-                    max: CO_MAX_DISPLAY,
+                    suggestedMax: CO_MAX_DISPLAY,
                     grid: {
                         color: 'rgba(75, 85, 99, 0.3)'
                     },
                     ticks: {
-                        color: '#9ca3af'
+                        color: '#9ca3af',
+                        callback: function(value) {
+                            return value + ' ppm';
+                        }
                     }
                 }
             },
@@ -236,6 +239,11 @@ function updateChart(readings) {
     });
 
     const values = recentReadings.map(r => r.co_ppm);
+
+    // Calculate dynamic Y-axis max based on data
+    const maxValue = Math.max(...values, CO_MAX_DISPLAY);
+    const yAxisMax = Math.ceil(maxValue * 1.1 / 10) * 10; // Round up to nearest 10 with 10% padding
+    coChart.options.scales.y.suggestedMax = Math.max(yAxisMax, CO_MAX_DISPLAY);
 
     // Update chart color based on latest value
     const latestValue = values[values.length - 1] || 0;

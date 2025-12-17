@@ -96,10 +96,27 @@ void app_main(void)
                     break;
                 case CMD_TEST:
                     ESP_LOGI(TAG, ">>> Received TEST command!");
-                    // Trigger test alarm (short beep)
-                    buzzer_set_active(true);
-                    vTaskDelay(pdMS_TO_TICKS(500));
-                    buzzer_set_active(false);
+                    // Full emergency test: activate all hardware for 3 seconds
+                    if (fsmEventQueue != NULL) {
+                        // Start emergency (activates buzzer, door, red LED)
+                        FSMEvent_t start_event = {
+                            .type = EVENT_CO_ALARM,
+                            .co_ppm = 999.0f  // Force emergency
+                        };
+                        xQueueSend(fsmEventQueue, &start_event, 0);
+                        ESP_LOGI(TAG, "TEST: Emergency started, running for 3 seconds...");
+
+                        // Wait 3 seconds
+                        vTaskDelay(pdMS_TO_TICKS(3000));
+
+                        // Stop emergency (returns to normal)
+                        FSMEvent_t stop_event = {
+                            .type = EVENT_CMD_STOP_EMER,
+                            .co_ppm = 0.0f
+                        };
+                        xQueueSend(fsmEventQueue, &stop_event, 0);
+                        ESP_LOGI(TAG, "TEST: Emergency stopped, returning to normal");
+                    }
                     break;
                 case CMD_OPEN_DOOR:
                     ESP_LOGI(TAG, ">>> Received OPEN_DOOR command!");
