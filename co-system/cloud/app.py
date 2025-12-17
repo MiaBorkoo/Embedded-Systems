@@ -11,7 +11,6 @@ from collections import deque
 from datetime import datetime
 import threading
 import logging
-import requests
 import paho.mqtt.client as mqtt
 from protocol_parser import (
     parse_packet,
@@ -60,28 +59,8 @@ TOPIC_COMMANDS = "nonfunctionals/commands"
 # State names for display
 STATE_NAMES = {0: "SAFE", 1: "WARNING", 2: "ALARM", 3: "DISARMED"}
 
-# IFTTT Webhook configuration
-IFTTT_WEBHOOK_URL = "https://maker.ifttt.com/trigger/emergency/json/with/key/3Fm19_fbowMFgl0emX4yQ"
-
-# Track emergency state to trigger webhook only once
-emergency_triggered = False
-
 # Thread lock for data access
 data_lock = threading.Lock()
-
-
-# ============== IFTTT Webhook ==============
-
-def trigger_emergency_webhook():
-    """Send POST request to IFTTT webhook when emergency mode is activated"""
-    try:
-        response = requests.post(IFTTT_WEBHOOK_URL, json={}, timeout=5)
-        if response.status_code == 200:
-            logger.info("Emergency webhook triggered successfully")
-        else:
-            logger.warning(f"Emergency webhook returned status code: {response.status_code}")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to trigger emergency webhook: {e}")
 
 
 # ============== MQTT Callbacks ==============
@@ -138,21 +117,7 @@ def on_message(client, userdata, msg):
                 "door": parsed["door_open"],
                 "timestamp": parsed["timestamp"]
             })
-            
-            # Check if device entered emergency mode (state 3)
-            global emergency_triggered
-            previous_state = device_status["state"]
-            new_state = parsed["state"]
-            device_status["state"] = new_state
-            
-            # Trigger webhook when transitioning to emergency state
-            if new_state == 3 and previous_state != 3 and not emergency_triggered:
-                emergency_triggered = True
-                # Run webhook in separate thread to avoid blocking MQTT
-                threading.Thread(target=trigger_emergency_webhook, daemon=True).start()
-            elif new_state != 3:
-                # Reset flag when leaving emergency state
-                emergency_triggered = False
+            device_status["state"] = parsed["state"]
 
         logger.info(
             f"Telemetry | CO={parsed['co_ppm']} Alarm={parsed['alarm_active']} Door={parsed['door_open']}"
