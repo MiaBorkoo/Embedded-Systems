@@ -37,7 +37,17 @@ void stats_task(void *arg) {
     while (1) {
         // Get current FSM state
         SystemState_t current_state = fsm_get_state();
-        const char *state_names[] = {"NORMAL", "OPEN", "EMERGENCY"};
+
+        // Safe array of state names including INIT
+        const char *state_names[] = {"INIT", "NORMAL", "OPEN", "EMERGENCY"};
+        size_t state_count = sizeof(state_names) / sizeof(state_names[0]);
+
+        // Clamp state to valid range
+        if ((size_t)current_state >= state_count) {
+            ESP_LOGW(TAG, "Unknown FSM state: %d", current_state);
+            current_state = 1; // default to NORMAL
+        }
+
         const char *current_state_name = state_names[current_state];
 
         // Print summary
