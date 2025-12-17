@@ -45,6 +45,7 @@ void app_main(void)
     buzzer_init();
     emergency_init();
     sensor_init();
+    stats_task_init();
 
     ESP_LOGI(TAG, "Hardware initialized! Starting 3-second self-test...");
     ESP_LOGI(TAG, "Task Priorities: sensor=10, fsm=5, agent=1");

@@ -48,7 +48,6 @@ static void fsm_set_state(SystemState_t new_state) {
     current_state = new_state;
     xSemaphoreGive(state_mutex);
 
-    stats_record_fsm(new_state);
 }
 
 // Send telemetry event to cloud
