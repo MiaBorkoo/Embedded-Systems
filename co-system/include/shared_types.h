@@ -7,9 +7,9 @@
  */
 typedef enum {
     CMD_NONE = 0,       // No command / invalid
-    CMD_ARM,            // Arm system - enable CO monitoring and alarms
-    CMD_DISARM,         // Disarm system - disable alarms (maintenance mode)
-    CMD_RESET,          // Reset alarm state after CO event cleared
+    CMD_START_EMER,     // Start emergency mode
+    CMD_STOP_EMER,      // Stop emergency mode
+    CMD_TEST,           // Test alarm
     CMD_OPEN_DOOR       // Request door open for ventilation
 } Command_t;
 
@@ -28,7 +28,7 @@ typedef enum {
 typedef enum {
     EVENT_BUTTON_PRESS,
     EVENT_CO_ALARM,      // CO >= threshold
-    EVENT_CMD_RESET      // Reset emergency from server
+    EVENT_CMD_STOP_EMER  // Stop emergency from server
 } EventType_t;
 
 #endif // SHARED_TYPES_H

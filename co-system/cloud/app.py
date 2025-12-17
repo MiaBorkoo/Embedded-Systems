@@ -15,10 +15,9 @@ import paho.mqtt.client as mqtt
 from protocol_parser import (
     parse_packet,
     build_command_packet,
-    CMD_ARM,
-    CMD_DISARM,
+    CMD_START_EMER,
+    CMD_STOP_EMER,
     CMD_TEST,
-    CMD_RESET,
     CMD_OPEN_DOOR,
     PROTOCOL_START_MARKER,
     PROTOCOL_END_MARKER
@@ -206,17 +205,16 @@ def send_command():
         return jsonify({"error": "Invalid or missing JSON in request body"}), 400
     command = data.get("command", "").upper()
 
-    valid_commands = ["ARM", "DISARM", "TEST", "RESET", "OPEN_DOOR"]
+    valid_commands = ["START_EMER", "STOP_EMER", "TEST", "OPEN_DOOR"]
     if command not in valid_commands:
         return jsonify({"error": f"Invalid command. Valid: {valid_commands}"}), 400
-    
+
 
     # Map command string to ID
     command_id_map = {
-        "ARM": CMD_ARM,
-        "DISARM": CMD_DISARM,
+        "START_EMER": CMD_START_EMER,
+        "STOP_EMER": CMD_STOP_EMER,
         "TEST": CMD_TEST,
-        "RESET": CMD_RESET,
         "OPEN_DOOR": CMD_OPEN_DOOR
     }
     command_id = command_id_map[command]

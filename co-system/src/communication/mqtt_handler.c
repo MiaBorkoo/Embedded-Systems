@@ -65,16 +65,16 @@ static void parse_command(const char *data, int len)
     
     switch (command_id) {
         case 0x01:
-            cmd = CMD_ARM;
-            ESP_LOGI(TAG, "Command: ARM");
+            cmd = CMD_START_EMER;
+            ESP_LOGI(TAG, "Command: START_EMER");
             break;
         case 0x02:
-            cmd = CMD_DISARM;
-            ESP_LOGI(TAG, "Command: DISARM");
+            cmd = CMD_STOP_EMER;
+            ESP_LOGI(TAG, "Command: STOP_EMER");
             break;
         case 0x03:
-            cmd = CMD_RESET;
-            ESP_LOGI(TAG, "Command: RESET");
+            cmd = CMD_TEST;
+            ESP_LOGI(TAG, "Command: TEST");
             break;
         case 0x04:
             cmd = CMD_OPEN_DOOR;
