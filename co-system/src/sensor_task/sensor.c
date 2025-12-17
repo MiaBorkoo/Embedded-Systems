@@ -12,6 +12,9 @@
 
 static const char *TAG = "CO_Sensor";
 
+// Global current CO reading - updated every sensor cycle, readable by FSM
+volatile float g_current_co_ppm = 0.0f;
+
 // Convert ADC reading to CO ppm
 // Linear mapping: 0-4095 ADC -> 0-200 ppm CO
 static float adc_to_co_ppm(int adc_value) {
@@ -35,7 +38,10 @@ void sensor_task(void *arg)
         // Read ADC
         int adc_reading = adc1_get_raw(ADC1_CHANNEL_6);
         float co_ppm = adc_to_co_ppm(adc_reading);
-        
+
+        // Update global for FSM to read
+        g_current_co_ppm = co_ppm;
+
         ESP_LOGI(TAG, "CO Sensor ADC: %d -> %.1f ppm", adc_reading, co_ppm);
         
         // Send to FSM if CO level exceeds threshold
