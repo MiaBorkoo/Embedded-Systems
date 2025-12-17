@@ -16,6 +16,7 @@
 #include "buzzer_task/buzzer.h"
 #include "emergency_state/emergency.h"
 #include "sensor_task/sensor.h"
+#include "stats/stats.h"
 
 static const char *TAG = "MAIN";
 
@@ -43,6 +44,7 @@ void app_main(void)
     buzzer_init();
     emergency_init();
     sensor_init();
+    stats_task_init();
 
     ESP_LOGI(TAG, "Hardware initialized! Starting 3-second self-test...");
     ESP_LOGI(TAG, "Task Priorities: sensor=10, fsm=5, agent=1");
@@ -66,6 +68,7 @@ void app_main(void)
         ESP_LOGW(TAG, "WiFi connection timeout - MQTT will retry when WiFi connects");
         // MQTT will be initialized later when WiFi connects
     }
+
 
     // Main loop - handle MQTT commands and monitor system
     uint32_t counter = 0;

@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
+#include "stats/stats.h"
 
 static const char *TAG = "CO_Sensor";
 
@@ -42,7 +43,10 @@ void sensor_task(void *arg)
         // Update global for FSM to read
         g_current_co_ppm = co_ppm;
 
-        ESP_LOGI(TAG, "CO Sensor ADC: %d -> %.1f ppm", adc_reading, co_ppm);
+        // Record for stats
+        stats_record_co(co_ppm);
+
+        ESP_LOGD(TAG, "CO Sensor ADC: %d -> %.1f ppm", adc_reading, co_ppm);
         
         // Send to FSM if CO level exceeds threshold
         if (co_ppm >= CO_THRESHOLD_SENSOR_PPM && fsmEventQueue != NULL) {

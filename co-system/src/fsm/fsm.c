@@ -10,6 +10,7 @@
 #include "esp_timer.h"
 #include "freertos/semphr.h"
 #include <string.h>
+#include "stats/stats.h"
 
 static const char *TAG = "FSM";
 
@@ -42,6 +43,7 @@ static void fsm_set_state(SystemState_t new_state) {
     xSemaphoreTake(state_mutex, portMAX_DELAY);
     current_state = new_state;
     xSemaphoreGive(state_mutex);
+
 }
 
 // Send telemetry event to cloud
@@ -130,6 +132,7 @@ static void handle_event(FSMEvent_t *event) {
                     next_state = STATE_OPEN;
                     break;
                 case EVENT_CO_ALARM:
+                    stats_record_co(event->co_ppm); 
                     next_state = STATE_EMERGENCY;
                     break;
                 case EVENT_CMD_STOP_EMER:
@@ -144,6 +147,7 @@ static void handle_event(FSMEvent_t *event) {
                     // Button allowed in OPEN, but already open - ignore
                     break;
                 case EVENT_CO_ALARM:
+                    stats_record_co(event->co_ppm);
                     next_state = STATE_EMERGENCY;
                     break;
                 case EVENT_CMD_STOP_EMER:
@@ -159,8 +163,9 @@ static void handle_event(FSMEvent_t *event) {
                     ESP_LOGW(TAG, "Button press ignored in EMERGENCY state");
                     break;
                 case EVENT_CO_ALARM:
+                    stats_record_co(event->co_ppm);
                     // Already in emergency, update CO reading
-                    ESP_LOGI(TAG, "Still in EMERGENCY (CO=%.1f ppm)", event->co_ppm);
+                    ESP_LOGD(TAG, "Still in EMERGENCY (CO=%.1f ppm)", event->co_ppm);
                     break;
                 case EVENT_CMD_STOP_EMER:
                     next_state = STATE_NORMAL;
