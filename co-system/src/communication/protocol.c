@@ -252,3 +252,37 @@ void protocol_print_packet(const uint8_t *packet, size_t packet_len, const char 
                  packet[packet_len - 2], packet[packet_len - 1]);
     }
 }
+
+bool protocol_decode_command(const uint8_t *packet, size_t packet_len, uint8_t *command_out) {
+    if (!packet || !command_out || packet_len < 8) {
+        ESP_LOGE(TAG, "Invalid parameters for decode_command");
+        return false;
+    }
+
+    // Verify packet integrity first
+    if (!protocol_verify_packet(packet, packet_len)) {
+        ESP_LOGE(TAG, "Command packet verification failed");
+        return false;
+    }
+
+    // Check message type
+    uint8_t msg_type = packet[1];
+    if (msg_type != MSG_TYPE_COMMAND) {
+        ESP_LOGW(TAG, "Not a command packet: type 0x%02X", msg_type);
+        return false;
+    }
+
+    // Extract payload length
+    uint8_t payload_length = packet[2];
+    if (payload_length < 1) {
+        ESP_LOGW(TAG, "Invalid command payload length: %d", payload_length);
+        return false;
+    }
+
+    // Extract command ID (first byte of payload at index 3)
+    *command_out = packet[3];
+
+    ESP_LOGD(TAG, "Decoded command packet: command_id=0x%02X", *command_out);
+
+    return true;
+}

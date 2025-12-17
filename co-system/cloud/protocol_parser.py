@@ -176,12 +176,22 @@ def parse_telemetry_packet(packet: bytes) -> Optional[Dict[str, Any]]:
         logger.error(f"Error parsing telemetry packet: {e}", exc_info=True)
         return None
 
-def parse_status_packet(packet: bytes):
+def parse_status_packet(packet: bytes) -> Optional[Dict[str, Any]]:
     if not verify_packet(packet):
         return None
-    payload = packet[3:-2]
+
+    payload_length = packet[2]
+
+    # Expecting at least 2 bytes: armed + state
+    if payload_length < 2:
+        logger.warning("Status payload too short")
+        return None
+
+    payload = packet[3:3 + payload_length]
+
     armed = bool(payload[0])
     state = payload[1]
+
     return {
         "armed": armed,
         "state": state,
