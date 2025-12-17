@@ -15,15 +15,15 @@
 
 static const char *TAG = "FSM";
 
+// Global CO reading from sensor task (defined in sensor.c)
+extern volatile float g_current_co_ppm;
+
 // Event queue
 QueueHandle_t fsmEventQueue = NULL;
 
 // Current state (protected by mutex)
 static SystemState_t current_state = STATE_INIT;
 static SemaphoreHandle_t state_mutex = NULL;
-
-// Last known CO reading (updated by sensor events, used for all telemetry)
-static float last_known_co = 0.0f;
 
 // Emergency webhook trigger flag (prevents duplicate triggers)
 static bool emergency_webhook_triggered = false;
@@ -121,11 +121,6 @@ static void handle_event(FSMEvent_t *event) {
     SystemState_t prev_state = fsm_get_state();
     SystemState_t next_state = prev_state;
 
-    // Update last known CO if this event has a valid reading
-    if (event->co_ppm > 0.0f) {
-        last_known_co = event->co_ppm;
-    }
-
     switch (prev_state) {
         case STATE_INIT:
             switch (event->type) {
@@ -191,10 +186,10 @@ static void handle_event(FSMEvent_t *event) {
             break;
     }
 
-    // Apply state transition using last known CO (not event's CO which may be 0)
+    // Apply state transition using current sensor CO reading
     if (next_state != prev_state) {
         fsm_set_state(next_state);
-        apply_state_config(next_state, last_known_co);
+        apply_state_config(next_state, g_current_co_ppm);
     }
 }
 
@@ -241,7 +236,7 @@ static void fsm_task(void *arg) {
             if (elapsed >= INIT_DURATION_MS) {
                 ESP_LOGI(TAG, "Init timer expired, transitioning to NORMAL");
                 fsm_set_state(STATE_NORMAL);
-                apply_state_config(STATE_NORMAL, last_known_co);
+                apply_state_config(STATE_NORMAL, g_current_co_ppm);
                 init_timer_active = false;
             }
         }
@@ -252,7 +247,7 @@ static void fsm_task(void *arg) {
             if (elapsed >= DOOR_OPEN_DURATION_MS) {
                 ESP_LOGI(TAG, "Door timer expired, returning to NORMAL");
                 fsm_set_state(STATE_NORMAL);
-                apply_state_config(STATE_NORMAL, last_known_co);
+                apply_state_config(STATE_NORMAL, g_current_co_ppm);
                 door_timer_active = false;
             }
         }
