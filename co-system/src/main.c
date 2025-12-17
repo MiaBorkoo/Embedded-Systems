@@ -5,6 +5,7 @@
 #include "freertos/queue.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "config.h"
 #include "communication/wifi_manager.h"
 #include "communication/mqtt_handler.h"
 #include "communication/agent_task.h"
@@ -27,7 +28,7 @@ void app_main(void)
     ESP_LOGI(TAG, "CO Safety System starting...");
 
     // Create command queue (for commands from cloud)
-    commandQueue = xQueueCreate(10, sizeof(Command_t));
+    commandQueue = xQueueCreate(QUEUE_SIZE_COMMAND, sizeof(Command_t));
 
     // Initialize agent task FIRST (creates telemetryQueue and ring buffer)
     agent_task_init();
@@ -120,7 +121,7 @@ void app_main(void)
                  state_names[current_state],
                  (unsigned long)counter++);
 
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(STATUS_LOG_INTERVAL_MS));
     }
 }
 #endif // UNIT_TEST

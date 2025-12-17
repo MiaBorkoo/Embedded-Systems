@@ -6,16 +6,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "shared_types.h"
+#include "config.h"
 
-// Event structure
-typedef struct {
-    EventType_t type;
-    float co_ppm;        // Used for CO_ALARM events
-} FSMEvent_t;
-
-// FSM task priority (between agent=1 and sensor=10)
-#define FSM_TASK_PRIORITY  5
-#define FSM_TASK_STACK     4096
+// Task configuration from config.h:
+// TASK_PRIORITY_FSM, TASK_STACK_FSM
 
 // External queue for sending events to FSM
 extern QueueHandle_t fsmEventQueue;

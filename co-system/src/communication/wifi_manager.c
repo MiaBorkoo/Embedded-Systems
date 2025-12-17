@@ -1,4 +1,5 @@
 #include "wifi_manager.h"
+#include "config.h"
 
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -8,12 +9,6 @@
 #include "esp_log.h"
 #include "esp_event.h"
 #include "nvs_flash.h"
-
-#define WIFI_SSID     "Ruan's A15"
-#define WIFI_PASSWORD "odowd_A15!!!"
-#define WIFI_INIT_MAX_RETRY     3
-#define WIFI_INIT_TIMEOUT_MS    10000
-#define WIFI_RECONNECT_DELAY_MS 5000
 
 static const char *TAG = "WIFI";
 // Event group to signal WiFi connection status
@@ -48,10 +43,10 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
         
         // During init phase, retry up to 3 times quickly
-        if (init_phase && init_retry_count < WIFI_INIT_MAX_RETRY) {
+        if (init_phase && init_retry_count < WIFI_MAX_RETRY) {
             init_retry_count++;
             ESP_LOGW(TAG, "WiFi connection failed (attempt %d/%d), retrying...", 
-                     init_retry_count, WIFI_INIT_MAX_RETRY);
+                     init_retry_count, WIFI_MAX_RETRY);
             esp_wifi_connect();
         } else {
             // After init phase or max retries, switch to 5-second background retries
@@ -102,7 +97,7 @@ void wifi_init(void)
     // Create reconnect timer (one-shot timer)
     reconnect_timer = xTimerCreate(
         "wifi_reconnect",
-        pdMS_TO_TICKS(WIFI_RECONNECT_DELAY_MS),
+        pdMS_TO_TICKS(WIFI_RECONNECT_MS),
         pdFALSE,  // One-shot timer
         NULL,
         reconnect_timer_callback

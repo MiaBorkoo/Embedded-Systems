@@ -32,4 +32,12 @@ typedef enum {
     EVENT_CMD_STOP_EMER  // Stop emergency from server
 } EventType_t;
 
+/**
+ * FSM event structure
+ */
+typedef struct {
+    EventType_t type;
+    float co_ppm;
+} FSMEvent_t;
+
 #endif // SHARED_TYPES_H
