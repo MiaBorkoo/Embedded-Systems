@@ -95,13 +95,13 @@
             <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
                 <h2 class="text-lg font-semibold mb-4">Device Controls</h2>
                 <div class="space-y-3">
-                    <button onclick="sendCommand('ARM')"
-                            class="w-full py-3 px-4 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors">
-                        ARM System
+                    <button onclick="sendCommand('START_EMER')"
+                            class="w-full py-3 px-4 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors">
+                        Start Emergency
                     </button>
-                    <button onclick="sendCommand('DISARM')"
-                            class="w-full py-3 px-4 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium transition-colors">
-                        DISARM System
+                    <button onclick="sendCommand('STOP_EMER')"
+                            class="w-full py-3 px-4 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors">
+                        Stop Emergency
                     </button>
                     <button onclick="sendCommand('TEST')"
                             class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors">
@@ -110,10 +110,6 @@
                     <button onclick="sendCommand('OPEN_DOOR')"
                             class="w-full py-3 px-4 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-colors">
                         Open Door
-                    </button>
-                    <button onclick="sendCommand('RESET')"
-                            class="w-full py-3 px-4 bg-gray-600 hover:bg-gray-700 rounded-lg font-medium transition-colors">
-                        Reset Alarm
                     </button>
                 </div>
                 <div id="command-feedback" class="mt-4 text-sm text-center hidden"></div>
