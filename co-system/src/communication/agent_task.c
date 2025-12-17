@@ -15,6 +15,7 @@
 #include "agent_task.h"
 #include "ring_buffer.h"
 #include "mqtt_handler.h"
+#include "config.h"
 
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -42,7 +43,7 @@ static void publish_telemetry(const Telemetry_t *telemetry) {
     if (protocol_encode_telemetry(telemetry, telemetry_packet, &telemetry_len)) {
         // Publish binary packet to MQTT
         bool success = mqtt_publish_raw(
-            TOPIC_CO,                    // Topic
+            MQTT_TOPIC_CO,               // Topic
             telemetry_packet,            // Binary data
             telemetry_len,               // Length
             0                            // QoS 0
@@ -65,7 +66,7 @@ static void publish_telemetry(const Telemetry_t *telemetry) {
 
         if (protocol_encode_event(telemetry, event_packet, &event_len)) {
             bool success = mqtt_publish_raw(
-                TOPIC_STATUS,            // Or TOPIC_DOOR for door events
+                MQTT_TOPIC_STATUS,       // Or TOPIC_DOOR for door events
                 event_packet,
                 event_len,
                 1                        // QoS 1 for events
@@ -118,7 +119,7 @@ void agent_task(void *params)
     bool was_connected = false;
     Telemetry_t data;
 
-    ESP_LOGI(TAG, "Agent task started (Priority %d)", AGENT_TASK_PRIORITY);
+    ESP_LOGI(TAG, "Agent task started (Priority %d)", TASK_PRIORITY_AGENT);
 
     while (1) {
         bool is_connected = mqtt_is_connected();
@@ -161,7 +162,7 @@ void agent_task_init(void)
 
     // Create telemetry queue (receives from alarm_task)
     // Size 10 = can buffer 10 items before alarm_task blocks
-    telemetryQueue = xQueueCreate(10, sizeof(Telemetry_t));
+    telemetryQueue = xQueueCreate(QUEUE_SIZE_TELEMETRY, sizeof(Telemetry_t));
     if (telemetryQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create telemetry queue");
         return;
@@ -171,9 +172,9 @@ void agent_task_init(void)
     BaseType_t ret = xTaskCreate(
         agent_task,
         "agent_task",
-        AGENT_TASK_STACK,
+        TASK_STACK_AGENT,
         NULL,
-        AGENT_TASK_PRIORITY,
+        TASK_PRIORITY_AGENT,
         NULL
     );
 

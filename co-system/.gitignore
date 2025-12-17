@@ -14,3 +14,4 @@ Makefile
 .DS_Store
 sdkconfig.*.old
 sdkconfig*
+config/config.h

@@ -9,7 +9,7 @@
 #include "mqtt_handler.h"
 #include "shared_types.h"
 #include "protocol.h"
-
+#include "config.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -19,10 +19,6 @@
 #include "esp_log.h"
 
 static const char *TAG = "MQTT";
-
-// MQTT Broker configuration
-#define MQTT_BROKER_URI  "mqtt://alderaan.software-engineering.ie:1883"
-#define MQTT_CLIENT_ID   "nonfunctionals-esp32"
 
 // MQTT client handle
 static esp_mqtt_client_handle_t mqtt_client = NULL;
@@ -105,8 +101,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "Connected to MQTT broker");
             mqtt_connected = true;
-            esp_mqtt_client_subscribe(mqtt_client, TOPIC_COMMANDS, 1);
-            ESP_LOGI(TAG, "Subscribed to %s", TOPIC_COMMANDS);
+            esp_mqtt_client_subscribe(mqtt_client, MQTT_TOPIC_COMMANDS, 1);
+            ESP_LOGI(TAG, "Subscribed to %s", MQTT_TOPIC_COMMANDS);
             break;
 
         case MQTT_EVENT_DISCONNECTED:
@@ -120,7 +116,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 
         case MQTT_EVENT_DATA:
             if (event->topic_len > 0 && event->data_len > 0) {
-                if (strncmp(event->topic, TOPIC_COMMANDS, event->topic_len) == 0) {
+                if (strncmp(event->topic, MQTT_TOPIC_COMMANDS, event->topic_len) == 0) {
                     parse_command(event->data, event->data_len);
                 }
             }
@@ -161,7 +157,7 @@ void mqtt_init(void)
         },
         .session = {
             .last_will = {
-                .topic = TOPIC_STATUS,
+                .topic = MQTT_TOPIC_STATUS,
                 .msg = (const char *)lwt_packet,
                 .msg_len = lwt_packet_len,
                 .qos = 1,

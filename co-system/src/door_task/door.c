@@ -1,5 +1,6 @@
 #include "door.h"
 #include "fsm/fsm.h"
+#include "config.h"
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -9,13 +10,11 @@
 static const char *TAG = "DoorTask";
 
 // Servo PWM parameters
-#define SERVO_FREQ    50
-#define SERVO_MIN_US  500
-#define SERVO_MAX_US  2400
+#define SERVO_FREQ    SERVO_FREQ_HZ
+#define SERVO_MIN_US  SERVO_MIN_PULSE_US
+#define SERVO_MAX_US  SERVO_MAX_PULSE_US
 #define SERVO_TIMER   LEDC_TIMER_0
 #define SERVO_CHANNEL LEDC_CHANNEL_0
-
-#define DEBOUNCE_MS     200   // 200ms debounce
 
 static volatile int64_t last_press_time = 0;
 
@@ -35,7 +34,7 @@ void door_set_angle(uint32_t angle) {
 // ISR for button - send event to FSM
 void IRAM_ATTR button_isr_handler(void* arg) {
     int64_t now = esp_timer_get_time();
-    if (now - last_press_time > DEBOUNCE_MS * 1000) {
+    if (now - last_press_time > BUTTON_DEBOUNCE_MS * 1000) {
         last_press_time = now;
         
         // Send button press event to FSM

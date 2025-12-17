@@ -5,6 +5,7 @@
 #include "freertos/queue.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "config.h"
 #include "communication/wifi_manager.h"
 #include "communication/mqtt_handler.h"
 #include "communication/agent_task.h"
@@ -22,18 +23,32 @@ static const char *TAG = "MAIN";
 // Queue for commands from MQTT (cloud -> device)
 QueueHandle_t commandQueue = NULL;
 
-// System state
-static bool system_armed = true;  // Start armed
-
 #ifndef UNIT_TEST
 void app_main(void)
 {
     ESP_LOGI(TAG, "CO Safety System starting...");
 
     // Create command queue (for commands from cloud)
-    commandQueue = xQueueCreate(10, sizeof(Command_t));
+    commandQueue = xQueueCreate(QUEUE_SIZE_COMMAND, sizeof(Command_t));
 
-    // Initialize WiFi (non-blocking - connects in background)
+    // Initialize agent task FIRST (creates telemetryQueue and ring buffer)
+    agent_task_init();
+
+    // Initialize FSM (creates mutex and queue before high-priority tasks need them)
+    // FSM starts in STATE_INIT for 3-second self-test
+    fsm_init();
+
+    // Initialize sensors/tasks that depend on FSM
+    // Self-test runs while WiFi connects in background
+    door_init();
+    buzzer_init();
+    emergency_init();
+    sensor_init();
+
+    ESP_LOGI(TAG, "Hardware initialized! Starting 3-second self-test...");
+    ESP_LOGI(TAG, "Task Priorities: sensor=10, fsm=5, agent=1");
+
+    // Initialize WiFi (non-blocking - connects in background during self-test)
     wifi_init();
 
     // Wait for WiFi to connect before starting MQTT (DNS resolution needs WiFi)
@@ -53,21 +68,6 @@ void app_main(void)
         // MQTT will be initialized later when WiFi connects
     }
 
-    // Initialize agent task (creates telemetryQueue and ring buffer)
-    agent_task_init();
-
-    // Initialize FSM FIRST (creates mutex and queue before high-priority tasks need them)
-    fsm_init();
-
-    // NOW initialize sensors/tasks that depend on FSM
-    door_init();
-    buzzer_init();
-    emergency_init();
-    sensor_init();
-    stats_task_init();
-
-    ESP_LOGI(TAG, "All systems initialized!");
-    ESP_LOGI(TAG, "Task Priorities: sensor=10, fsm=5, agent=1");
 
     // Main loop - handle MQTT commands and monitor system
     uint32_t counter = 0;
@@ -99,10 +99,27 @@ void app_main(void)
                     break;
                 case CMD_TEST:
                     ESP_LOGI(TAG, ">>> Received TEST command!");
-                    // Trigger test alarm (short beep)
-                    buzzer_set_active(true);
-                    vTaskDelay(pdMS_TO_TICKS(500));
-                    buzzer_set_active(false);
+                    // Full emergency test: activate all hardware for 3 seconds
+                    if (fsmEventQueue != NULL) {
+                        // Start emergency (activates buzzer, door, red LED)
+                        FSMEvent_t start_event = {
+                            .type = EVENT_CO_ALARM,
+                            .co_ppm = 999.0f  // Force emergency
+                        };
+                        xQueueSend(fsmEventQueue, &start_event, 0);
+                        ESP_LOGI(TAG, "TEST: Emergency started, running for 3 seconds...");
+
+                        // Wait 3 seconds
+                        vTaskDelay(pdMS_TO_TICKS(3000));
+
+                        // Stop emergency (returns to normal)
+                        FSMEvent_t stop_event = {
+                            .type = EVENT_CMD_STOP_EMER,
+                            .co_ppm = 0.0f
+                        };
+                        xQueueSend(fsmEventQueue, &stop_event, 0);
+                        ESP_LOGI(TAG, "TEST: Emergency stopped, returning to normal");
+                    }
                     break;
                 case CMD_OPEN_DOOR:
                     ESP_LOGI(TAG, ">>> Received OPEN_DOOR command!");
@@ -115,7 +132,7 @@ void app_main(void)
 
         // Status log
         SystemState_t current_state = fsm_get_state();
-        const char *state_names[] = {"NORMAL", "OPEN", "EMERGENCY"};
+        const char *state_names[] = {"INIT", "NORMAL", "OPEN", "EMERGENCY"};
         ESP_LOGI(TAG, "WiFi: %s | MQTT: %s | Buffer: %d | State: %s | Count: %lu",
                  wifi_is_connected() ? "OK" : "NO",
                  mqtt_is_connected() ? "OK" : "NO",
@@ -123,7 +140,7 @@ void app_main(void)
                  state_names[current_state],
                  (unsigned long)counter++);
 
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(STATUS_LOG_INTERVAL_MS));
     }
 }
 #endif // UNIT_TEST

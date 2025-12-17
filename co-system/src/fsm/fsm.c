@@ -4,6 +4,7 @@
 #include "emergency_state/emergency.h"
 #include "communication/agent_task.h"
 #include "communication/ring_buffer.h"
+#include "config.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -13,18 +14,15 @@
 
 static const char *TAG = "FSM";
 
-// CO threshold for emergency
-#define CO_THRESHOLD_PPM 35.0f
-
-// Door open duration
-#define DOOR_OPEN_DURATION_MS 5000
-
 // Event queue
 QueueHandle_t fsmEventQueue = NULL;
 
 // Current state (protected by mutex)
-static SystemState_t current_state = STATE_NORMAL;
+static SystemState_t current_state = STATE_INIT;
 static SemaphoreHandle_t state_mutex = NULL;
+
+// Last known CO reading (updated by sensor events, used for all telemetry)
+static float last_known_co = 0.0f;
 
 // Get current state (thread-safe)
 SystemState_t fsm_get_state(void) {
@@ -69,6 +67,15 @@ static void send_telemetry_event(const char *event, float co_ppm, SystemState_t 
 // Apply hardware configuration for current state
 static void apply_state_config(SystemState_t state, float co_ppm) {
     switch (state) {
+        case STATE_INIT:
+            ESP_LOGI(TAG, ">>> STATE: INIT (self-test for 3s)");
+            gpio_set_level(GREEN_LED_PIN, 1);  // Green ON
+            gpio_set_level(RED_LED_PIN, 1);    // Red ON
+            door_set_angle(90);                 // Door open
+            buzzer_set_active(true);            // Buzzer ON
+            // send_telemetry_event("STATE_INIT", co_ppm, STATE_INIT);
+            break;
+            
         case STATE_NORMAL:
             ESP_LOGI(TAG, ">>> STATE: NORMAL");
             gpio_set_level(GREEN_LED_PIN, 1);  // Green ON
@@ -79,7 +86,7 @@ static void apply_state_config(SystemState_t state, float co_ppm) {
             break;
             
         case STATE_OPEN:
-            ESP_LOGI(TAG, ">>> STATE: OPEN (door opens for 5s)");
+            ESP_LOGI(TAG, ">>> STATE: OPEN (ventilation mode)");
             gpio_set_level(GREEN_LED_PIN, 1);  // Green ON
             gpio_set_level(RED_LED_PIN, 0);    // Red OFF
             door_set_angle(90);                 // Door open
@@ -88,7 +95,7 @@ static void apply_state_config(SystemState_t state, float co_ppm) {
             break;
             
         case STATE_EMERGENCY:
-            ESP_LOGI(TAG, ">>> STATE: EMERGENCY (CO=%.1f ppm)", co_ppm);
+            ESP_LOGI(TAG, ">>> STATE: EMERGENCY (CO ALARM!)");
             gpio_set_level(GREEN_LED_PIN, 0);  // Green OFF
             gpio_set_level(RED_LED_PIN, 1);    // Red ON
             door_set_angle(90);                 // Door open for ventilation
@@ -102,8 +109,29 @@ static void apply_state_config(SystemState_t state, float co_ppm) {
 static void handle_event(FSMEvent_t *event) {
     SystemState_t prev_state = fsm_get_state();
     SystemState_t next_state = prev_state;
-    
+
+    // Update last known CO if this event has a valid reading
+    if (event->co_ppm > 0.0f) {
+        last_known_co = event->co_ppm;
+    }
+
     switch (prev_state) {
+        case STATE_INIT:
+            switch (event->type) {
+                case EVENT_BUTTON_PRESS:
+                    // Button ignored during initialization
+                    ESP_LOGW(TAG, "Button press ignored in INIT state");
+                    break;
+                case EVENT_CO_ALARM:
+                    // CO alarm immediately transitions to emergency
+                    next_state = STATE_EMERGENCY;
+                    break;
+                case EVENT_CMD_STOP_EMER:
+                    // Stop emergency command ignored during initialization
+                    break;
+            }
+            break;
+
         case STATE_NORMAL:
             switch (event->type) {
                 case EVENT_BUTTON_PRESS:
@@ -118,7 +146,7 @@ static void handle_event(FSMEvent_t *event) {
                     break;
             }
             break;
-            
+
         case STATE_OPEN:
             switch (event->type) {
                 case EVENT_BUTTON_PRESS:
@@ -133,7 +161,7 @@ static void handle_event(FSMEvent_t *event) {
                     break;
             }
             break;
-            
+
         case STATE_EMERGENCY:
             switch (event->type) {
                 case EVENT_BUTTON_PRESS:
@@ -151,24 +179,28 @@ static void handle_event(FSMEvent_t *event) {
             }
             break;
     }
-    
-    // Apply state transition
+
+    // Apply state transition using last known CO (not event's CO which may be 0)
     if (next_state != prev_state) {
         fsm_set_state(next_state);
-        apply_state_config(next_state, event->co_ppm);
+        apply_state_config(next_state, last_known_co);
     }
 }
 
 // FSM task - main loop
 static void fsm_task(void *arg) {
     FSMEvent_t event;
+    TickType_t init_start_time = 0;
     TickType_t door_close_time = 0;
+    bool init_timer_active = false;
     bool door_timer_active = false;
     
-    ESP_LOGI(TAG, "FSM task started (Priority %d)", FSM_TASK_PRIORITY);
+    ESP_LOGI(TAG, "FSM task started (Priority %d)", TASK_PRIORITY_FSM);
     
-    // Set initial state
-    apply_state_config(STATE_NORMAL, 0.0f);
+    // Set initial state and start init timer
+    apply_state_config(STATE_INIT, 0.0f);
+    init_start_time = xTaskGetTickCount();
+    init_timer_active = true;
     
     while (1) {
         // Check for events (50ms timeout)
@@ -185,15 +217,31 @@ static void fsm_task(void *arg) {
             if (fsm_get_state() != STATE_OPEN) {
                 door_timer_active = false;
             }
+            
+            // Cancel init timer if leaving INIT state (e.g., CO alarm)
+            if (fsm_get_state() != STATE_INIT) {
+                init_timer_active = false;
+            }
         }
         
+        // Handle init auto-transition timer
+        if (init_timer_active && fsm_get_state() == STATE_INIT) {
+            TickType_t elapsed = (xTaskGetTickCount() - init_start_time) * portTICK_PERIOD_MS;
+            if (elapsed >= INIT_DURATION_MS) {
+                ESP_LOGI(TAG, "Init timer expired, transitioning to NORMAL");
+                fsm_set_state(STATE_NORMAL);
+                apply_state_config(STATE_NORMAL, last_known_co);
+                init_timer_active = false;
+            }
+        }
+
         // Handle door auto-close timer
         if (door_timer_active && fsm_get_state() == STATE_OPEN) {
             TickType_t elapsed = (xTaskGetTickCount() - door_close_time) * portTICK_PERIOD_MS;
             if (elapsed >= DOOR_OPEN_DURATION_MS) {
                 ESP_LOGI(TAG, "Door timer expired, returning to NORMAL");
                 fsm_set_state(STATE_NORMAL);
-                apply_state_config(STATE_NORMAL, 0.0f);
+                apply_state_config(STATE_NORMAL, last_known_co);
                 door_timer_active = false;
             }
         }
@@ -219,7 +267,7 @@ void fsm_init(void) {
     }
     
     // Create event queue
-    fsmEventQueue = xQueueCreate(10, sizeof(FSMEvent_t));
+    fsmEventQueue = xQueueCreate(QUEUE_SIZE_FSM_EVENT, sizeof(FSMEvent_t));
     if (fsmEventQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create event queue");
         return;
@@ -229,9 +277,9 @@ void fsm_init(void) {
     BaseType_t ret = xTaskCreate(
         fsm_task,
         "fsm_task",
-        FSM_TASK_STACK,
+        TASK_STACK_FSM,
         NULL,
-        FSM_TASK_PRIORITY,
+        TASK_PRIORITY_FSM,
         NULL
     );
     

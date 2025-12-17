@@ -1,4 +1,5 @@
 #include "buzzer.h"
+#include "config.h"
 #include "driver/ledc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -6,8 +7,6 @@
 
 static const char *TAG = "Buzzer";
 static volatile bool buzzer_active = false;
-
-#define BEEP_INTERVAL_MS 300
 
 static void play_tone(bool on) {
     if (on) {
@@ -33,7 +32,7 @@ static void buzzer_task(void *arg) {
     while (1) {
         if (buzzer_active) {
             TickType_t now = xTaskGetTickCount();
-            if ((now - lastToggle) * portTICK_PERIOD_MS >= BEEP_INTERVAL_MS) {
+            if ((now - lastToggle) * portTICK_PERIOD_MS >= BUZZER_BEEP_INTERVAL_MS) {
                 lastToggle = now;
                 tone_on = !tone_on;
                 play_tone(tone_on);
@@ -51,7 +50,7 @@ void buzzer_init(void) {
         .speed_mode = LEDC_HIGH_SPEED_MODE,
         .timer_num = BUZZER_TIMER,
         .duty_resolution = LEDC_TIMER_10_BIT,
-        .freq_hz = BUZZER_FREQ,
+        .freq_hz = BUZZER_FREQ_HZ,
         .clk_cfg = LEDC_AUTO_CLK
     };
     ledc_timer_config(&timer_conf);
@@ -67,7 +66,7 @@ void buzzer_init(void) {
     };
     ledc_channel_config(&channel_conf);
 
-    xTaskCreate(buzzer_task, "buzzer_task", 2048, NULL, 5, NULL);
+    xTaskCreate(buzzer_task, "buzzer_task", TASK_STACK_BUZZER, NULL, 5, NULL);
 
     ESP_LOGI(TAG, "Passive buzzer initialized");
 }
