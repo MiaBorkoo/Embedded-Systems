@@ -77,29 +77,36 @@ void app_main(void)
         Command_t cmd;
         if (xQueueReceive(commandQueue, &cmd, 0) == pdTRUE) {
             switch (cmd) {
-                case CMD_ARM:
-                    ESP_LOGI(TAG, ">>> Received ARM command!");
-                    system_armed = true;
-                    mqtt_publish_status(STATE_INIT, system_armed);
-                    break;
-                case CMD_DISARM:
-                    ESP_LOGI(TAG, ">>> Received DISARM command!");
-                    system_armed = false;
-                    mqtt_publish_status(STATE_EMERGENCY, system_armed);  // Use enum for clarity
-                    break;
-                case CMD_OPEN_DOOR:
-                    ESP_LOGI(TAG, ">>> Received OPEN_DOOR command!");
-                    door_open_request();
-                    break;
-                case CMD_RESET:
-                    ESP_LOGI(TAG, ">>> Received RESET command!");
+                case CMD_START_EMER:
+                    ESP_LOGI(TAG, ">>> Received START_EMER command!");
                     if (fsmEventQueue != NULL) {
                         FSMEvent_t event = {
-                            .type = EVENT_CMD_RESET,
+                            .type = EVENT_CO_ALARM,
+                            .co_ppm = 999.0f  // Force emergency
+                        };
+                        xQueueSend(fsmEventQueue, &event, 0);
+                    }
+                    break;
+                case CMD_STOP_EMER:
+                    ESP_LOGI(TAG, ">>> Received STOP_EMER command!");
+                    if (fsmEventQueue != NULL) {
+                        FSMEvent_t event = {
+                            .type = EVENT_CMD_STOP_EMER,
                             .co_ppm = 0.0f
                         };
                         xQueueSend(fsmEventQueue, &event, 0);
                     }
+                    break;
+                case CMD_TEST:
+                    ESP_LOGI(TAG, ">>> Received TEST command!");
+                    // Trigger test alarm (short beep)
+                    buzzer_set_active(true);
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    buzzer_set_active(false);
+                    break;
+                case CMD_OPEN_DOOR:
+                    ESP_LOGI(TAG, ">>> Received OPEN_DOOR command!");
+                    door_open_request();
                     break;
                 default:
                     break;

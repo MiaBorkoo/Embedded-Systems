@@ -137,7 +137,7 @@ static void handle_event(FSMEvent_t *event) {
                 case EVENT_CO_ALARM:
                     next_state = STATE_EMERGENCY;
                     break;
-                case EVENT_CMD_RESET:
+                case EVENT_CMD_STOP_EMER:
                     // Already in normal, ignore
                     break;
             }
@@ -151,7 +151,7 @@ static void handle_event(FSMEvent_t *event) {
                 case EVENT_CO_ALARM:
                     next_state = STATE_EMERGENCY;
                     break;
-                case EVENT_CMD_RESET:
+                case EVENT_CMD_STOP_EMER:
                     // No emergency active, ignore
                     break;
             }
@@ -167,7 +167,7 @@ static void handle_event(FSMEvent_t *event) {
                     // Already in emergency, update CO reading
                     ESP_LOGI(TAG, "Still in EMERGENCY (CO=%.1f ppm)", event->co_ppm);
                     break;
-                case EVENT_CMD_RESET:
+                case EVENT_CMD_STOP_EMER:
                     next_state = STATE_NORMAL;
                     break;
             }

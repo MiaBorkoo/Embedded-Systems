@@ -138,7 +138,7 @@ void wifi_init(void)
         .sta = {
             .ssid = WIFI_SSID,
             .password = WIFI_PASSWORD,
-            .threshold.authmode = WIFI_AUTH_OPEN,  // Accept any auth mode for Android compatibility
+            .threshold.authmode = WIFI_AUTH_OPEN,  
         },
     };
 

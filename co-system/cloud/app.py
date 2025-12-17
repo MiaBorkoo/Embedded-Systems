@@ -10,10 +10,28 @@ from flask import Flask, render_template, jsonify, request
 from collections import deque
 from datetime import datetime
 import threading
-import json
+import logging
 import paho.mqtt.client as mqtt
+from protocol_parser import (
+    parse_packet,
+    build_command_packet,
+    CMD_START_EMER,
+    CMD_STOP_EMER,
+    CMD_TEST,
+    CMD_OPEN_DOOR,
+    PROTOCOL_START_MARKER,
+    PROTOCOL_END_MARKER
+)
 
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,  
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 # In-memory storage (last 100 of each)
 readings = deque(maxlen=100)
@@ -69,52 +87,55 @@ def on_disconnect(client, userdata, flags, reason_code, properties):
 
 
 def on_message(client, userdata, msg):
-    """Handle incoming MQTT messages"""
-    try:
-        payload = json.loads(msg.payload.decode())
-        topic = msg.topic
+    payload = msg.payload
 
+    if len(payload) < 6:
+        logger.warning("Packet too short — dropped")
+        return
+
+    if payload[0] != PROTOCOL_START_MARKER or payload[-1] != PROTOCOL_END_MARKER:
+        logger.warning("Invalid binary markers — dropped")
+        return
+
+    parsed = parse_packet(payload)
+    if parsed is None:
+        logger.warning("Binary packet failed validation — dropped")
+        return
+
+    packet_type = parsed["packet_type"]
+
+    with data_lock:
+        device_status["connected"] = True
+        device_status["last_update"] = parsed["received_at"]
+
+    if packet_type == "telemetry":
         with data_lock:
-            if topic == TOPIC_CO:
-                # CO sensor reading
-                reading = {
-                    "co_ppm": payload.get("co_ppm", 0),
-                    "timestamp": payload.get("timestamp", 0),
-                    "state": payload.get("state", 0),
-                    "alarm": payload.get("alarm", False),
-                    "door": payload.get("door", False),
-                    "received_at": datetime.now().isoformat()
-                }
-                readings.append(reading)
-                current_reading.update({
-                    "co_ppm": reading["co_ppm"],
-                    "alarm": reading["alarm"],
-                    "door": reading["door"],
-                    "timestamp": reading["timestamp"]
-                })
-                device_status["state"] = reading["state"]
-                device_status["last_update"] = reading["received_at"]
+            readings.append(parsed)
+            current_reading.update({
+                "co_ppm": parsed["co_ppm"],
+                "alarm": parsed["alarm_active"],
+                "door": parsed["door_open"],
+                "timestamp": parsed["timestamp"]
+            })
+            device_status["state"] = parsed["state"]
 
-            elif topic == TOPIC_EVENTS:
-                # Door/alarm events
-                event = {
-                    "event": payload.get("event", "UNKNOWN"),
-                    "co_ppm": payload.get("co_ppm", 0),
-                    "timestamp": payload.get("timestamp", 0),
-                    "received_at": datetime.now().isoformat()
-                }
-                events.append(event)
+        logger.info(
+            f"Telemetry | CO={parsed['co_ppm']} Alarm={parsed['alarm_active']} Door={parsed['door_open']}"
+        )
 
-            elif topic == TOPIC_STATUS:
-                # Device status update
-                device_status["state"] = payload.get("state", 0)
-                device_status["armed"] = payload.get("armed", False)
-                device_status["last_update"] = datetime.now().isoformat()
+    elif packet_type == "event":
+        with data_lock:
+            events.append(parsed)
+        logger.info(f"Event | {parsed['event']}")
+    
+    elif packet_type == "status":
+        with data_lock:
+            device_status["armed"] = parsed["armed"]
+            device_status["state"] = parsed["state"]
+            device_status["last_update"] = parsed["received_at"]
 
-    except json.JSONDecodeError as e:
-        print(f"[MQTT] JSON decode error: {e}")
-    except Exception as e:
-        print(f"[MQTT] Error processing message: {e}")
+    else:
+        logger.warning(f"Unhandled packet type: {packet_type}")
 
 
 # ============== MQTT Client Setup ==============
@@ -184,12 +205,25 @@ def send_command():
         return jsonify({"error": "Invalid or missing JSON in request body"}), 400
     command = data.get("command", "").upper()
 
-    valid_commands = ["ARM", "DISARM", "TEST", "RESET", "OPEN_DOOR"]
+    valid_commands = ["START_EMER", "STOP_EMER", "TEST", "OPEN_DOOR"]
     if command not in valid_commands:
         return jsonify({"error": f"Invalid command. Valid: {valid_commands}"}), 400
 
-    payload = json.dumps({"command": command})
-    result = mqtt_client.publish(TOPIC_COMMANDS, payload, qos=1)
+
+    # Map command string to ID
+    command_id_map = {
+        "START_EMER": CMD_START_EMER,
+        "STOP_EMER": CMD_STOP_EMER,
+        "TEST": CMD_TEST,
+        "OPEN_DOOR": CMD_OPEN_DOOR
+    }
+    command_id = command_id_map[command]
+
+    # Build binary packet
+    packet = build_command_packet(command_id)
+
+    # Publish to MQTT
+    result = mqtt_client.publish(TOPIC_COMMANDS, packet, qos=1)
 
     if result.rc == mqtt.MQTT_ERR_SUCCESS:
         # Log the command as an event
@@ -203,7 +237,6 @@ def send_command():
         return jsonify({"success": True, "command": command})
     else:
         return jsonify({"error": "Failed to publish command"}), 500
-
 
 # ============== Main ==============
 
