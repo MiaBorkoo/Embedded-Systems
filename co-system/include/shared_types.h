@@ -17,9 +17,10 @@ typedef enum {
  * System states - managed by FSM
  */
 typedef enum {
-    STATE_NORMAL = 0,      // Normal operation, door closed
-    STATE_OPEN = 1,        // Door open (button press)
-    STATE_EMERGENCY = 2    // Emergency mode (CO alarm)
+    STATE_INIT = 0,        // Initialization/self-test (3 seconds)
+    STATE_NORMAL = 1,      // Normal operation, door closed
+    STATE_OPEN = 2,        // Door open (button press)
+    STATE_EMERGENCY = 3    // Emergency mode (CO alarm)
 } SystemState_t;
 
 /**

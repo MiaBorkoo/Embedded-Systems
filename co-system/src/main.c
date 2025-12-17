@@ -32,7 +32,24 @@ void app_main(void)
     // Create command queue (for commands from cloud)
     commandQueue = xQueueCreate(10, sizeof(Command_t));
 
-    // Initialize WiFi (non-blocking - connects in background)
+    // Initialize agent task FIRST (creates telemetryQueue and ring buffer)
+    agent_task_init();
+
+    // Initialize FSM (creates mutex and queue before high-priority tasks need them)
+    // FSM starts in STATE_INIT for 3-second self-test
+    fsm_init();
+
+    // Initialize sensors/tasks that depend on FSM
+    // Self-test runs while WiFi connects in background
+    door_init();
+    buzzer_init();
+    emergency_init();
+    sensor_init();
+
+    ESP_LOGI(TAG, "Hardware initialized! Starting 3-second self-test...");
+    ESP_LOGI(TAG, "Task Priorities: sensor=10, fsm=5, agent=1");
+
+    // Initialize WiFi (non-blocking - connects in background during self-test)
     wifi_init();
 
     // Wait for WiFi to connect before starting MQTT (DNS resolution needs WiFi)
@@ -52,21 +69,6 @@ void app_main(void)
         // MQTT will be initialized later when WiFi connects
     }
 
-    // Initialize agent task (creates telemetryQueue and ring buffer)
-    agent_task_init();
-
-    // Initialize FSM FIRST (creates mutex and queue before high-priority tasks need them)
-    fsm_init();
-
-    // NOW initialize sensors/tasks that depend on FSM
-    door_init();
-    buzzer_init();
-    emergency_init();
-    sensor_init();
-
-    ESP_LOGI(TAG, "All systems initialized!");
-    ESP_LOGI(TAG, "Task Priorities: sensor=10, fsm=5, agent=1");
-
     // Main loop - handle MQTT commands and monitor system
     uint32_t counter = 0;
 
@@ -78,12 +80,12 @@ void app_main(void)
                 case CMD_ARM:
                     ESP_LOGI(TAG, ">>> Received ARM command!");
                     system_armed = true;
-                    mqtt_publish_status(0, system_armed);
+                    mqtt_publish_status(STATE_INIT, system_armed);
                     break;
                 case CMD_DISARM:
                     ESP_LOGI(TAG, ">>> Received DISARM command!");
                     system_armed = false;
-                    mqtt_publish_status(3, system_armed);  // state=3 (DISARMED)
+                    mqtt_publish_status(STATE_EMERGENCY, system_armed);  // Use enum for clarity
                     break;
                 case CMD_OPEN_DOOR:
                     ESP_LOGI(TAG, ">>> Received OPEN_DOOR command!");
@@ -106,7 +108,7 @@ void app_main(void)
 
         // Status log
         SystemState_t current_state = fsm_get_state();
-        const char *state_names[] = {"NORMAL", "OPEN", "EMERGENCY"};
+        const char *state_names[] = {"INIT", "NORMAL", "OPEN", "EMERGENCY"};
         ESP_LOGI(TAG, "WiFi: %s | MQTT: %s | Buffer: %d | State: %s | Count: %lu",
                  wifi_is_connected() ? "OK" : "NO",
                  mqtt_is_connected() ? "OK" : "NO",
