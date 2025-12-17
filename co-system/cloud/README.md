@@ -51,10 +51,10 @@ The dashboard will be available at: `http://alderaan.software-engineering.ie:500
 Send via POST to `/api/command` with JSON body:
 
 ```json
-{"command": "ARM"}
+{"command": "START_EMER"}
 ```
 
-Valid commands: `ARM`, `DISARM`, `TEST`, `RESET`, `OPEN_DOOR`
+Valid commands: `START_EMER`, `STOP_EMER`, `TEST`, `OPEN_DOOR`
 
 ## Running in Background
 
