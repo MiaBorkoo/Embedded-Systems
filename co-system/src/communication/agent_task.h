@@ -3,10 +3,10 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "config.h"
 
-// Agent task priority - lowest (cloud comms not safety-critical)
-#define AGENT_TASK_PRIORITY  1
-#define AGENT_TASK_STACK     4096
+// Task configuration from config.h:
+// TASK_PRIORITY_AGENT, TASK_STACK_AGENT
 
 // Initialize and start the agent task
 void agent_task_init(void);

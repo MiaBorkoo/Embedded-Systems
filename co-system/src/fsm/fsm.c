@@ -4,6 +4,7 @@
 #include "emergency_state/emergency.h"
 #include "communication/agent_task.h"
 #include "communication/ring_buffer.h"
+#include "config.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -11,15 +12,6 @@
 #include <string.h>
 
 static const char *TAG = "FSM";
-
-// CO threshold for emergency
-#define CO_THRESHOLD_PPM 35.0f
-
-// Initialization self-test duration
-#define INIT_DURATION_MS 3000
-
-// Door open duration
-#define DOOR_OPEN_DURATION_MS 5000
 
 // Event queue
 QueueHandle_t fsmEventQueue = NULL;
@@ -88,7 +80,7 @@ static void apply_state_config(SystemState_t state, float co_ppm) {
             break;
             
         case STATE_OPEN:
-            ESP_LOGI(TAG, ">>> STATE: OPEN (door opens for 5s)");
+            ESP_LOGI(TAG, ">>> STATE: OPEN (ventilation mode)");
             gpio_set_level(GREEN_LED_PIN, 1);  // Green ON
             gpio_set_level(RED_LED_PIN, 0);    // Red OFF
             door_set_angle(90);                 // Door open
@@ -97,7 +89,7 @@ static void apply_state_config(SystemState_t state, float co_ppm) {
             break;
             
         case STATE_EMERGENCY:
-            ESP_LOGI(TAG, ">>> STATE: EMERGENCY (CO=%.1f ppm)", co_ppm);
+            ESP_LOGI(TAG, ">>> STATE: EMERGENCY (CO ALARM!)");
             gpio_set_level(GREEN_LED_PIN, 0);  // Green OFF
             gpio_set_level(RED_LED_PIN, 1);    // Red ON
             door_set_angle(90);                 // Door open for ventilation
@@ -189,7 +181,7 @@ static void fsm_task(void *arg) {
     bool init_timer_active = false;
     bool door_timer_active = false;
     
-    ESP_LOGI(TAG, "FSM task started (Priority %d)", FSM_TASK_PRIORITY);
+    ESP_LOGI(TAG, "FSM task started (Priority %d)", TASK_PRIORITY_FSM);
     
     // Set initial state and start init timer
     apply_state_config(STATE_INIT, 0.0f);
@@ -261,7 +253,7 @@ void fsm_init(void) {
     }
     
     // Create event queue
-    fsmEventQueue = xQueueCreate(10, sizeof(FSMEvent_t));
+    fsmEventQueue = xQueueCreate(QUEUE_SIZE_FSM_EVENT, sizeof(FSMEvent_t));
     if (fsmEventQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create event queue");
         return;
@@ -271,9 +263,9 @@ void fsm_init(void) {
     BaseType_t ret = xTaskCreate(
         fsm_task,
         "fsm_task",
-        FSM_TASK_STACK,
+        TASK_STACK_FSM,
         NULL,
-        FSM_TASK_PRIORITY,
+        TASK_PRIORITY_FSM,
         NULL
     );
     

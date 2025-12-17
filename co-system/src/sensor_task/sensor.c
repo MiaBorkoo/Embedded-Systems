@@ -2,6 +2,7 @@
 #include "fsm/fsm.h"
 #include "communication/agent_task.h"
 #include "communication/ring_buffer.h"
+#include "config.h"
 #include "driver/adc.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -10,9 +11,6 @@
 #include <string.h>
 
 static const char *TAG = "CO_Sensor";
-
-// CO threshold for triggering emergency
-#define CO_THRESHOLD_PPM 100.0f
 
 // Convert ADC reading to CO ppm
 // Linear mapping: 0-4095 ADC -> 0-200 ppm CO
@@ -24,10 +22,10 @@ void sensor_init(void)
 {
     // ADC config
     adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_DB_11); // GPIO34 = ADC1_CH6
+    adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_DB_11); // CO_SENSOR_PIN = GPIO34 = ADC1_CH6
 
     // Create FreeRTOS task
-    xTaskCreate(sensor_task, "sensor_task", 2048, NULL, 10, NULL);
+    xTaskCreate(sensor_task, "sensor_task", TASK_STACK_SENSOR, NULL, TASK_PRIORITY_SENSOR, NULL);
 }
 
 void sensor_task(void *arg)
@@ -41,7 +39,7 @@ void sensor_task(void *arg)
         ESP_LOGI(TAG, "CO Sensor ADC: %d -> %.1f ppm", adc_reading, co_ppm);
         
         // Send to FSM if CO level exceeds threshold
-        if (co_ppm >= CO_THRESHOLD_PPM && fsmEventQueue != NULL) {
+        if (co_ppm >= CO_THRESHOLD_SENSOR_PPM && fsmEventQueue != NULL) {
             FSMEvent_t event = {
                 .type = EVENT_CO_ALARM,
                 .co_ppm = co_ppm
@@ -63,6 +61,6 @@ void sensor_task(void *arg)
             xQueueSend(telemetryQueue, &telem, 0);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(500)); // read every 0.5 sec
+        vTaskDelay(pdMS_TO_TICKS(SENSOR_READING_INTERVAL_MS));
     }
 }
