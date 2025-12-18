@@ -11,7 +11,6 @@
 #include "esp_timer.h"
 #include "freertos/semphr.h"
 #include <string.h>
-#include "stats/stats.h"
 
 static const char *TAG = "FSM";
 
@@ -134,7 +133,6 @@ static void handle_event(FSMEvent_t *event) {
                     next_state = STATE_OPEN;
                     break;
                 case EVENT_CO_ALARM:
-                    stats_record_co(event->co_ppm); 
                     next_state = STATE_EMERGENCY;
                     break;
                 case EVENT_CMD_STOP_EMER:
@@ -147,7 +145,6 @@ static void handle_event(FSMEvent_t *event) {
                 case EVENT_BUTTON_PRESS:
                     break;
                 case EVENT_CO_ALARM:
-                    stats_record_co(event->co_ppm);
                     next_state = STATE_EMERGENCY;
                     break;
                 case EVENT_CMD_STOP_EMER:
@@ -161,8 +158,7 @@ static void handle_event(FSMEvent_t *event) {
                     ESP_LOGW(TAG, "Button press ignored in EMERGENCY state");
                     break;
                 case EVENT_CO_ALARM:
-                    stats_record_co(event->co_ppm);
-                    ESP_LOGD(TAG, "Still in EMERGENCY (CO=%.1f ppm)", event->co_ppm);
+                    // Already in emergency - sensor task handles stats
                     break;
                 case EVENT_CMD_STOP_EMER:
                     next_state = STATE_NORMAL;

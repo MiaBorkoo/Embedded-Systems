@@ -6,13 +6,6 @@
 #include <stddef.h>
 #include "config.h"
 
-
-#define TOPIC_CO        MQTT_TOPIC_CO
-#define TOPIC_DOOR      MQTT_TOPIC_EVENTS
-#define TOPIC_STATUS    MQTT_TOPIC_STATUS
-#define TOPIC_COMMANDS  MQTT_TOPIC_COMMANDS
-
-
 void mqtt_init(void);
 bool mqtt_is_connected(void);
 

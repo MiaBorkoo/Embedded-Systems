@@ -48,7 +48,9 @@ void app_main(void)
     stats_task_init();
 
     ESP_LOGI(TAG, "Hardware initialized! Starting 3-second self-test...");
-    ESP_LOGI(TAG, "Task Priorities: sensor=10, fsm=5, agent=1");
+    ESP_LOGI(TAG, "Task Priorities: sensor=%d, fsm=%d, buzzer=%d, agent=%d, ifttt=%d, stats=%d",
+             TASK_PRIORITY_SENSOR, TASK_PRIORITY_FSM, TASK_PRIORITY_BUZZER,
+             TASK_PRIORITY_AGENT, TASK_PRIORITY_IFTTT, TASK_PRIORITY_STATS);
 
     // Initialize WiFi (non-blocking - connects in background during self-test)
     wifi_init();
@@ -87,7 +89,7 @@ void app_main(void)
                     if (fsmEventQueue != NULL) {
                         FSMEvent_t event = {
                             .type = EVENT_CO_ALARM,
-                            .co_ppm = 999.0f  // Force emergency
+                            .co_ppm = 0.0f  // FSM uses g_current_co_ppm for telemetry
                         };
                         xQueueSend(fsmEventQueue, &event, 0);
                     }
@@ -109,7 +111,7 @@ void app_main(void)
                         // Start emergency (activates buzzer, door, red LED)
                         FSMEvent_t start_event = {
                             .type = EVENT_CO_ALARM,
-                            .co_ppm = 999.0f  // Force emergency
+                            .co_ppm = 0.0f  // FSM uses g_current_co_ppm for telemetry
                         };
                         xQueueSend(fsmEventQueue, &start_event, 0);
                         ESP_LOGI(TAG, "TEST: Emergency started, running for 3 seconds...");

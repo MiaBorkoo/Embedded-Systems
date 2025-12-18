@@ -66,7 +66,7 @@ void buzzer_init(void) {
     };
     ledc_channel_config(&channel_conf);
 
-    xTaskCreate(buzzer_task, "buzzer_task", TASK_STACK_BUZZER, NULL, 5, NULL);
+    xTaskCreate(buzzer_task, "buzzer_task", TASK_STACK_BUZZER, NULL, TASK_PRIORITY_BUZZER, NULL);
 
     ESP_LOGI(TAG, "Passive buzzer initialized");
 }
