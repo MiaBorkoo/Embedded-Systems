@@ -66,7 +66,7 @@ static void publish_telemetry(const Telemetry_t *telemetry) {
 
         if (protocol_encode_event(telemetry, event_packet, &event_len)) {
             bool success = mqtt_publish_raw(
-                MQTT_TOPIC_STATUS,       // Or TOPIC_DOOR for door events
+                MQTT_TOPIC_STATUS,
                 event_packet,
                 event_len,
                 1                        // QoS 1 for events

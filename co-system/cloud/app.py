@@ -52,7 +52,6 @@ current_reading = {
 
 # MQTT Topics
 TOPIC_CO = "nonfunctionals/sensors/co"
-TOPIC_EVENTS = "nonfunctionals/events/door"
 TOPIC_STATUS = "nonfunctionals/status"
 TOPIC_COMMANDS = "nonfunctionals/commands"
 
@@ -68,9 +67,8 @@ data_lock = threading.Lock()
 def on_connect(client, userdata, flags, reason_code, properties):
     """Called when connected to MQTT broker"""
     print(f"[MQTT] Connected with result code: {reason_code}")
-    # Subscribe to all ESP32 topics
+    # Subscribe to ESP32 topics
     client.subscribe(TOPIC_CO)
-    client.subscribe(TOPIC_EVENTS)
     client.subscribe(TOPIC_STATUS)
     print(f"[MQTT] Subscribed to topics")
     with data_lock:

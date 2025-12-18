@@ -7,12 +7,7 @@
 #include "config.h"
 
 // MQTT Topics defined in config.h:
-// MQTT_TOPIC_CO, MQTT_TOPIC_EVENTS, MQTT_TOPIC_STATUS, MQTT_TOPIC_COMMANDS
-// Legacy names for backward compatibility:
-#define TOPIC_CO        MQTT_TOPIC_CO
-#define TOPIC_DOOR      MQTT_TOPIC_EVENTS
-#define TOPIC_STATUS    MQTT_TOPIC_STATUS
-#define TOPIC_COMMANDS  MQTT_TOPIC_COMMANDS
+// MQTT_TOPIC_CO, MQTT_TOPIC_STATUS, MQTT_TOPIC_COMMANDS
 
 
 void mqtt_init(void);
