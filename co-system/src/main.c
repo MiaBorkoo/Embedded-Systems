@@ -10,6 +10,7 @@
 #include "communication/mqtt_handler.h"
 #include "communication/agent_task.h"
 #include "communication/ring_buffer.h"
+#include "communication/ifttt_webhook.h"
 #include "shared_types.h"
 #include "fsm/fsm.h"
 #include "door_task/door.h"
@@ -64,6 +65,9 @@ void app_main(void)
         ESP_LOGI(TAG, "WiFi connected! Starting MQTT...");
         // Initialize MQTT (now WiFi is ready for DNS resolution)
         mqtt_init();
+        
+        // Initialize IFTTT webhook (requires WiFi for HTTP requests)
+        ifttt_webhook_init();
     } else {
         ESP_LOGW(TAG, "WiFi connection timeout - MQTT will retry when WiFi connects");
         // MQTT will be initialized later when WiFi connects

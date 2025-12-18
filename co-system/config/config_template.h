@@ -83,4 +83,12 @@
 // ============== Button Configuration ==============
 #define BUTTON_DEBOUNCE_MS          200
 
+// ============== IFTTT Webhook Configuration ==============
+#define IFTTT_ENABLED               1       // 0=disabled, 1=enabled
+#define IFTTT_WEBHOOK_URL           "https://maker.ifttt.com/trigger/emergency/json/with/key/YOUR_KEY"
+#define IFTTT_TIMEOUT_MS            5000    // HTTP request timeout
+#define TASK_PRIORITY_IFTTT         1       // Same as agent (low priority)
+#define TASK_STACK_IFTTT            4096    // Stack for HTTP client
+#define QUEUE_SIZE_IFTTT            2       // Webhook trigger queue
+
 #endif // CONFIG_H

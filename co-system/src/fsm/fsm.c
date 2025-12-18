@@ -4,6 +4,7 @@
 #include "emergency_state/emergency.h"
 #include "communication/agent_task.h"
 #include "communication/ring_buffer.h"
+#include "communication/ifttt_webhook.h"
 #include "config.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
@@ -23,6 +24,9 @@ QueueHandle_t fsmEventQueue = NULL;
 // Current state (protected by mutex)
 static SystemState_t current_state = STATE_INIT;
 static SemaphoreHandle_t state_mutex = NULL;
+
+// Emergency webhook trigger flag (prevents duplicate triggers)
+static bool emergency_webhook_triggered = false;
 
 // Get current state (thread-safe)
 SystemState_t fsm_get_state(void) {
@@ -82,6 +86,8 @@ static void apply_state_config(SystemState_t state, float co_ppm) {
             door_set_angle(0);                  // Door closed
             buzzer_set_active(false);           // Buzzer OFF
             send_telemetry_event("STATE_NORMAL", co_ppm, STATE_NORMAL);
+            // Reset webhook flag when returning to normal
+            emergency_webhook_triggered = false;
             break;
             
         case STATE_OPEN:
@@ -100,6 +106,12 @@ static void apply_state_config(SystemState_t state, float co_ppm) {
             door_set_angle(90);                 // Door open for ventilation
             buzzer_set_active(true);            // Buzzer ON
             send_telemetry_event("EMERGENCY_ON", co_ppm, STATE_EMERGENCY);
+            
+            // Trigger IFTTT webhook once per emergency session
+            if (!emergency_webhook_triggered) {
+                ifttt_webhook_trigger();
+                emergency_webhook_triggered = true;
+            }
             break;
     }
 }
