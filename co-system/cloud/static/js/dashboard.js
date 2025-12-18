@@ -4,9 +4,9 @@
  */
 
 // CO Thresholds (ppm)
-const CO_WARNING = 35;
-const CO_DANGER = 100;
-const CO_MAX_DISPLAY = 150;
+const CO_WARNING = 8;
+const CO_DANGER = 10;
+const CO_MAX_DISPLAY = 50;
 
 // Chart instance
 let coChart = null;

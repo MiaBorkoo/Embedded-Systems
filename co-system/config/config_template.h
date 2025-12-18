@@ -44,8 +44,7 @@
 #define CO_SENSOR_PIN       34  // ADC1 Channel 6
 
 // ============== System Thresholds ==============
-#define CO_THRESHOLD_ALARM_PPM      35.0f   // Trigger emergency state
-#define CO_THRESHOLD_SENSOR_PPM     100.0f  // Sensor reading threshold
+#define CO_THRESHOLD_SENSOR_PPM     10.0f   // CO level to trigger emergency
 
 // ============== Timing Configuration ==============
 #define INIT_DURATION_MS            3000    // Self-test duration
