@@ -6,22 +6,15 @@ Connects to MQTT broker at localhost:1883 (runs on alderaan)
 Subscribes to ESP32 telemetry, publishes commands
 """
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask
 from collections import deque
-from datetime import datetime
 import threading
 import logging
-import paho.mqtt.client as mqtt
-from protocol_parser import (
-    parse_packet,
-    build_command_packet,
-    CMD_START_EMER,
-    CMD_STOP_EMER,
-    CMD_TEST,
-    CMD_OPEN_DOOR,
-    PROTOCOL_START_MARKER,
-    PROTOCOL_END_MARKER
-)
+
+# Import refactored modules
+from parser import protocol_parser
+from mqtt.mqtt_client import MQTTClientManager
+from routes.api_routes import register_routes
 
 app = Flask(__name__)
 
@@ -33,240 +26,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# In-memory storage (last 100 of each)
-readings = deque(maxlen=100)
-events = deque(maxlen=50)
-device_status = {
-    "state": 0,
-    "armed": False,
-    "last_update": None,
-    "connected": False,
-    "broker_connected": False  # Tracks MQTT broker connection (not device)
+# In-memory data storage
+data_store = {
+    "readings": deque(maxlen=100),
+    "events": deque(maxlen=50),
+    "device_status": {
+        "state": 0,
+        "armed": False,
+        "last_update": None,
+        "connected": False,
+        "broker_connected": False
+    },
+    "current_reading": {
+        "co_ppm": 0.0,
+        "alarm": False,
+        "door": False,
+        "timestamp": 0
+    },
+    "lock": threading.Lock()
 }
-current_reading = {
-    "co_ppm": 0.0,
-    "alarm": False,
-    "door": False,
-    "timestamp": 0
-}
 
-# MQTT Topics
-TOPIC_CO = "nonfunctionals/sensors/co"
-TOPIC_STATUS = "nonfunctionals/status"
-TOPIC_COMMANDS = "nonfunctionals/commands"
+# Initialize MQTT client
+mqtt_manager = MQTTClientManager(data_store, protocol_parser)
 
-# State names for display
-STATE_NAMES = {0: "INIT", 1: "NORMAL", 2: "OPEN", 3: "EMERGENCY"}
-
-# Thread lock for data access
-data_lock = threading.Lock()
-
-
-# ============== MQTT Callbacks ==============
-
-def on_connect(client, userdata, flags, reason_code, properties):
-    """Called when connected to MQTT broker"""
-    print(f"[MQTT] Connected with result code: {reason_code}")
-    # Subscribe to ESP32 topics
-    client.subscribe(TOPIC_CO)
-    client.subscribe(TOPIC_STATUS)
-    print(f"[MQTT] Subscribed to topics")
-    with data_lock:
-        device_status["connected"] = True
-        device_status["broker_connected"] = True
-
-
-def on_disconnect(client, userdata, flags, reason_code, properties):
-    """Called when disconnected from MQTT broker"""
-    print(f"[MQTT] Disconnected with result code: {reason_code}")
-    with data_lock:
-        device_status["connected"] = False
-        device_status["broker_connected"] = False
-
-
-def on_message(client, userdata, msg):
-    payload = msg.payload
-
-    if len(payload) < 6:
-        logger.warning("Packet too short — dropped")
-        return
-
-    if payload[0] != PROTOCOL_START_MARKER or payload[-1] != PROTOCOL_END_MARKER:
-        logger.warning("Invalid binary markers — dropped")
-        return
-
-    parsed = parse_packet(payload)
-    if parsed is None:
-        logger.warning("Binary packet failed validation — dropped")
-        return
-
-    packet_type = parsed["packet_type"]
-
-    with data_lock:
-        device_status["connected"] = True
-        device_status["last_update"] = parsed["received_at"]
-
-    if packet_type == "telemetry":
-        with data_lock:
-            readings.append(parsed)
-            current_reading.update({
-                "co_ppm": parsed["co_ppm"],
-                "alarm": parsed["alarm_active"],
-                "door": parsed["door_open"],
-                "timestamp": parsed["timestamp"]
-            })
-            device_status["state"] = parsed["state"]
-
-        logger.info(
-            f"Telemetry | CO={parsed['co_ppm']} Alarm={parsed['alarm_active']} Door={parsed['door_open']}"
-        )
-
-    elif packet_type == "event":
-        with data_lock:
-            events.append(parsed)
-        logger.info(f"Event | {parsed['event']}")
-    
-    elif packet_type == "status":
-        with data_lock:
-            device_status["armed"] = parsed["armed"]
-            device_status["state"] = parsed["state"]
-            device_status["last_update"] = parsed["received_at"]
-
-    else:
-        logger.warning(f"Unhandled packet type: {packet_type}")
-
-
-# ============== MQTT Client Setup ==============
-
-mqtt_client = mqtt.Client(
-    callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-    client_id="nonfunctionals-dashboard"
-)
-mqtt_client.on_connect = on_connect
-mqtt_client.on_disconnect = on_disconnect
-mqtt_client.on_message = on_message
-
-
-def start_mqtt():
-    """Start MQTT client in background thread"""
-    try:
-        mqtt_client.connect("localhost", 1883, 60)
-        mqtt_client.loop_start()
-        print("[MQTT] Client started")
-    except Exception as e:
-        print(f"[MQTT] Connection failed: {e}")
-        print("[MQTT] WARNING: Dashboard will not receive data or send commands!")
-        with data_lock:
-            device_status["broker_connected"] = False
-
-
-# ============== Flask Routes ==============
-
-@app.route("/")
-def index():
-    """Serve the dashboard page"""
-    return render_template("index.html")
-
-
-@app.route("/api/readings")
-def get_readings():
-    """Return recent CO readings"""
-    with data_lock:
-        return jsonify({
-            "readings": list(readings),
-            "current": current_reading.copy()
-        })
-
-
-@app.route("/api/events")
-def get_events():
-    """Return recent events with pagination"""
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)
-
-    # Clamp per_page to reasonable limits
-    per_page = max(5, min(per_page, 50))
-
-    with data_lock:
-        all_events = list(events)
-
-    # Reverse to show newest first
-    all_events = all_events[::-1]
-
-    total = len(all_events)
-    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
-
-    # Clamp page to valid range
-    page = max(1, min(page, total_pages))
-
-    # Slice for current page
-    start = (page - 1) * per_page
-    end = start + per_page
-    page_events = all_events[start:end]
-
-    return jsonify({
-        "events": page_events,
-        "pagination": {
-            "page": page,
-            "per_page": per_page,
-            "total": total,
-            "total_pages": total_pages,
-            "has_prev": page > 1,
-            "has_next": page < total_pages
-        }
-    })
-
-
-@app.route("/api/status")
-def get_status():
-    """Return current device status"""
-    with data_lock:
-        status = device_status.copy()
-        status["state_name"] = STATE_NAMES.get(status["state"], "UNKNOWN")
-        status["current"] = current_reading.copy()
-        return jsonify(status)
-
-
-@app.route("/api/command", methods=["POST"])
-def send_command():
-    """Send command to device via MQTT"""
-    data = request.get_json()
-    if not isinstance(data, dict):
-        return jsonify({"error": "Invalid or missing JSON in request body"}), 400
-    command = data.get("command", "").upper()
-
-    valid_commands = ["START_EMER", "STOP_EMER", "TEST", "OPEN_DOOR"]
-    if command not in valid_commands:
-        return jsonify({"error": f"Invalid command. Valid: {valid_commands}"}), 400
-
-
-    # Map command string to ID
-    command_id_map = {
-        "START_EMER": CMD_START_EMER,
-        "STOP_EMER": CMD_STOP_EMER,
-        "TEST": CMD_TEST,
-        "OPEN_DOOR": CMD_OPEN_DOOR
-    }
-    command_id = command_id_map[command]
-
-    # Build binary packet
-    packet = build_command_packet(command_id)
-
-    # Publish to MQTT
-    result = mqtt_client.publish(TOPIC_COMMANDS, packet, qos=1)
-
-    if result.rc == mqtt.MQTT_ERR_SUCCESS:
-        # Log the command as an event
-        with data_lock:
-            events.append({
-                "event": f"CMD_{command}",
-                "co_ppm": current_reading["co_ppm"],
-                "timestamp": 0,
-                "received_at": datetime.now().isoformat()
-            })
-        return jsonify({"success": True, "command": command})
-    else:
-        return jsonify({"error": "Failed to publish command"}), 500
+# Register all API routes
+register_routes(app, data_store, mqtt_manager, protocol_parser)
 
 # ============== Main ==============
 
@@ -277,7 +61,7 @@ if __name__ == "__main__":
     print("=" * 50)
 
     # Start MQTT in background
-    start_mqtt()
+    mqtt_manager.start()
 
     # Run Flask (debug=False to prevent MQTT double-connection from reloader)
     app.run(host="0.0.0.0", port=8080, debug=False)
