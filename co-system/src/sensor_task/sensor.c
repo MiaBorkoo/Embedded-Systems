@@ -13,7 +13,6 @@
 
 static const char *TAG = "CO_Sensor";
 
-// Global current CO reading - updated every sensor cycle, readable by FSM
 volatile float g_current_co_ppm = 0.0f;
 
 // Convert ADC reading to CO ppm
@@ -24,11 +23,9 @@ static float adc_to_co_ppm(int adc_value) {
 
 void sensor_init(void)
 {
-    // ADC config
     adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_DB_11); // CO_SENSOR_PIN = GPIO34 = ADC1_CH6
 
-    // Create FreeRTOS task
     xTaskCreate(sensor_task, "sensor_task", TASK_STACK_SENSOR, NULL, TASK_PRIORITY_SENSOR, NULL);
 }
 
@@ -36,19 +33,14 @@ void sensor_task(void *arg)
 {
     while (1)
     {
-        // Read ADC
         int adc_reading = adc1_get_raw(ADC1_CHANNEL_6);
         float co_ppm = adc_to_co_ppm(adc_reading);
-
-        // Update global for FSM to read
         g_current_co_ppm = co_ppm;
 
-        // Record for stats
         stats_record_co(co_ppm);
 
         ESP_LOGD(TAG, "CO Sensor ADC: %d -> %.1f ppm", adc_reading, co_ppm);
         
-        // Send to FSM if CO level exceeds threshold
         if (co_ppm >= CO_THRESHOLD_SENSOR_PPM && fsmEventQueue != NULL) {
             FSMEvent_t event = {
                 .type = EVENT_CO_ALARM,
@@ -57,7 +49,7 @@ void sensor_task(void *arg)
             xQueueSend(fsmEventQueue, &event, 0);
         }
         
-        // Send telemetry to cloud (for monitoring)
+        // Send telemetry to cloud
         if (telemetryQueue != NULL) {
             SystemState_t state = fsm_get_state();
             Telemetry_t telem = {
