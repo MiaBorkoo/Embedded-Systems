@@ -8,9 +8,6 @@
 #include "shared_types.h"
 #include "config.h"
 
-// Task configuration from config.h:
-// TASK_PRIORITY_FSM, TASK_STACK_FSM
-
 // External queue for sending events to FSM
 extern QueueHandle_t fsmEventQueue;
 

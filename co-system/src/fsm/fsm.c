@@ -14,24 +14,17 @@
 
 static const char *TAG = "FSM";
 
-// Global CO reading from sensor task (defined in sensor.c)
 extern volatile float g_current_co_ppm;
-
-// Event queue
 QueueHandle_t fsmEventQueue = NULL;
 
-// Current state (protected by mutex)
 static SystemState_t current_state = STATE_INIT;
 static SemaphoreHandle_t state_mutex = NULL;
 
-// Emergency webhook trigger flag (prevents duplicate triggers)
 static bool emergency_webhook_triggered = false;
 
-// Get current state (thread-safe)
 SystemState_t fsm_get_state(void) {
-    // Handle case where FSM not yet initialized
-    if (state_mutex == NULL) {
-        return STATE_NORMAL;  // Return default state if FSM not ready
+        if (state_mutex == NULL) {
+        return STATE_NORMAL;
     }
     
     SystemState_t state;
@@ -124,15 +117,12 @@ static void handle_event(FSMEvent_t *event) {
         case STATE_INIT:
             switch (event->type) {
                 case EVENT_BUTTON_PRESS:
-                    // Button ignored during initialization
                     ESP_LOGW(TAG, "Button press ignored in INIT state");
                     break;
                 case EVENT_CO_ALARM:
-                    // CO alarm immediately transitions to emergency
                     next_state = STATE_EMERGENCY;
                     break;
                 case EVENT_CMD_STOP_EMER:
-                    // Stop emergency command ignored during initialization
                     break;
             }
             break;
@@ -146,7 +136,6 @@ static void handle_event(FSMEvent_t *event) {
                     next_state = STATE_EMERGENCY;
                     break;
                 case EVENT_CMD_STOP_EMER:
-                    // Already in normal, ignore
                     break;
             }
             break;
@@ -154,13 +143,11 @@ static void handle_event(FSMEvent_t *event) {
         case STATE_OPEN:
             switch (event->type) {
                 case EVENT_BUTTON_PRESS:
-                    // Button allowed in OPEN, but already open - ignore
                     break;
                 case EVENT_CO_ALARM:
                     next_state = STATE_EMERGENCY;
                     break;
                 case EVENT_CMD_STOP_EMER:
-                    // No emergency active, ignore
                     break;
             }
             break;
@@ -168,7 +155,6 @@ static void handle_event(FSMEvent_t *event) {
         case STATE_EMERGENCY:
             switch (event->type) {
                 case EVENT_BUTTON_PRESS:
-                    // Button ignored in EMERGENCY
                     ESP_LOGW(TAG, "Button press ignored in EMERGENCY state");
                     break;
                 case EVENT_CO_ALARM:
@@ -181,7 +167,6 @@ static void handle_event(FSMEvent_t *event) {
             break;
     }
 
-    // Apply state transition using current sensor CO reading
     if (next_state != prev_state) {
         fsm_set_state(next_state);
         apply_state_config(next_state, g_current_co_ppm);
@@ -198,34 +183,25 @@ static void fsm_task(void *arg) {
     
     ESP_LOGI(TAG, "FSM task started (Priority %d)", TASK_PRIORITY_FSM);
     
-    // Set initial state and start init timer
     apply_state_config(STATE_INIT, 0.0f);
     init_start_time = xTaskGetTickCount();
     init_timer_active = true;
     
     while (1) {
-        // Check for events (50ms timeout)
         if (xQueueReceive(fsmEventQueue, &event, pdMS_TO_TICKS(50)) == pdTRUE) {
-            handle_event(&event);
-            
-            // Start door timer if entering OPEN state
+            handle_event(&event); 
             if (fsm_get_state() == STATE_OPEN) {
                 door_close_time = xTaskGetTickCount();
                 door_timer_active = true;
             }
-            
-            // Cancel door timer if leaving OPEN state
             if (fsm_get_state() != STATE_OPEN) {
                 door_timer_active = false;
             }
-            
-            // Cancel init timer if leaving INIT state (e.g., CO alarm)
             if (fsm_get_state() != STATE_INIT) {
                 init_timer_active = false;
             }
         }
         
-        // Handle init auto-transition timer
         if (init_timer_active && fsm_get_state() == STATE_INIT) {
             TickType_t elapsed = (xTaskGetTickCount() - init_start_time) * portTICK_PERIOD_MS;
             if (elapsed >= INIT_DURATION_MS) {
@@ -236,7 +212,6 @@ static void fsm_task(void *arg) {
             }
         }
 
-        // Handle door auto-close timer
         if (door_timer_active && fsm_get_state() == STATE_OPEN) {
             TickType_t elapsed = (xTaskGetTickCount() - door_close_time) * portTICK_PERIOD_MS;
             if (elapsed >= DOOR_OPEN_DURATION_MS) {
@@ -250,7 +225,6 @@ static void fsm_task(void *arg) {
 }
 
 void fsm_init(void) {
-    // Initialize LED GPIOs (centralized control)
     gpio_config_t led_conf = {
         .pin_bit_mask = (1ULL << GREEN_LED_PIN) | (1ULL << RED_LED_PIN),
         .mode = GPIO_MODE_OUTPUT,
@@ -260,21 +234,18 @@ void fsm_init(void) {
     };
     gpio_config(&led_conf);
     
-    // Create state mutex
     state_mutex = xSemaphoreCreateMutex();
     if (state_mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create state mutex");
         return;
     }
     
-    // Create event queue
     fsmEventQueue = xQueueCreate(QUEUE_SIZE_FSM_EVENT, sizeof(FSMEvent_t));
     if (fsmEventQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create event queue");
         return;
     }
     
-    // Create FSM task
     BaseType_t ret = xTaskCreate(
         fsm_task,
         "fsm_task",

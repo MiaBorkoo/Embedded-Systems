@@ -199,7 +199,6 @@ function updateConnectionStatus(status) {
 
     // Update state display
     const stateValue = document.getElementById('state-value');
-    const armedStatus = document.getElementById('armed-status');
 
     stateValue.textContent = status.state_name || '--';
     stateValue.classList.remove('co-safe', 'co-warning', 'co-danger');
@@ -213,9 +212,6 @@ function updateConnectionStatus(status) {
     } else {
         stateValue.classList.add('co-safe');
     }
-
-    armedStatus.textContent = status.armed ? 'System Armed' : 'System Disarmed';
-    armedStatus.className = status.armed ? 'text-sm text-green-500 mt-2' : 'text-sm text-yellow-500 mt-2';
 
     // Update last update time
     if (status.last_update) {
