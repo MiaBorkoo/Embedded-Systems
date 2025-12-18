@@ -1,12 +1,12 @@
 # Smart CO Safety System
 
 **Team:** The Non-Functionals
-**Module:** CS4447 - IoT Embedded Systems (fun times hihi)
+**Module:** CS4447 - IoT Embedded Systems
 
 **Authors:**
 - Mia Borko (@MiaBorkoo)
 - Ruan O'Dowd (@ruqn)
-- Alisia Kazimierek (@alisiak04)
+- Alisia K (@alisiak04)
 
 A real-time Carbon Monoxide safety system built on ESP32 with FreeRTOS.
 
@@ -61,8 +61,7 @@ Priority groups: Safety (5), Output (4), Cloud (2), Monitor (1)
 | Topic | Direction | Description |
 |-------|-----------|-------------|
 | `nonfunctionals/sensors/co` | Device → Cloud | CO telemetry |
-| `nonfunctionals/events/door` | Device → Cloud | State change events |
-| `nonfunctionals/status` | Device → Cloud | Device status |
+| `nonfunctionals/status` | Device → Cloud | Events and device status |
 | `nonfunctionals/commands` | Cloud → Device | Remote commands |
 
 ## Commands
