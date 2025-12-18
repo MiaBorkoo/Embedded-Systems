@@ -56,7 +56,7 @@ TOPIC_STATUS = "nonfunctionals/status"
 TOPIC_COMMANDS = "nonfunctionals/commands"
 
 # State names for display
-STATE_NAMES = {0: "SAFE", 1: "WARNING", 2: "ALARM", 3: "DISARMED"}
+STATE_NAMES = {0: "INIT", 1: "NORMAL", 2: "OPEN", 3: "EMERGENCY"}
 
 # Thread lock for data access
 data_lock = threading.Lock()
