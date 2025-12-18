@@ -26,7 +26,6 @@
 
 // MQTT Topics
 #define MQTT_TOPIC_CO       "your-team/sensors/co"
-#define MQTT_TOPIC_EVENTS   "your-team/events/door"
 #define MQTT_TOPIC_STATUS   "your-team/status"
 #define MQTT_TOPIC_COMMANDS "your-team/commands"
 

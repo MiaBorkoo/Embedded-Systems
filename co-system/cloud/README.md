@@ -32,8 +32,7 @@ The dashboard will be available at: `http://alderaan.software-engineering.ie:500
 | Topic | Direction | Description |
 |-------|-----------|-------------|
 | `nonfunctionals/sensors/co` | ESP32 -> Cloud | CO readings |
-| `nonfunctionals/events/door` | ESP32 -> Cloud | Events (alarm, door) |
-| `nonfunctionals/status` | ESP32 -> Cloud | Device status |
+| `nonfunctionals/status` | ESP32 -> Cloud | Events and device status |
 | `nonfunctionals/commands` | Cloud -> ESP32 | Commands |
 
 ## API Endpoints
