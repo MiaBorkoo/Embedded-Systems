@@ -44,8 +44,7 @@
 #define CO_SENSOR_PIN       34  // ADC1 Channel 6
 
 // ============== System Thresholds ==============
-#define CO_THRESHOLD_ALARM_PPM      35.0f   // Trigger emergency state
-#define CO_THRESHOLD_SENSOR_PPM     100.0f  // Sensor reading threshold
+#define CO_THRESHOLD_SENSOR_PPM     10.0f   // CO level to trigger emergency
 
 // ============== Timing Configuration ==============
 #define INIT_DURATION_MS            3000    // Self-test duration
@@ -55,14 +54,19 @@
 #define STATUS_LOG_INTERVAL_MS      2000    // Main loop status log
 
 // ============== Task Configuration ==============
-#define TASK_PRIORITY_SENSOR        10      // Highest (safety-critical)
-#define TASK_PRIORITY_FSM           5       // Medium
-#define TASK_PRIORITY_AGENT         1       // Lowest (cloud comms)
+// Priority groups: Safety (5), Output (4), Cloud (2), Monitor (1)
+#define TASK_PRIORITY_SENSOR        5       // Safety-critical (same as FSM)
+#define TASK_PRIORITY_FSM           5       // Safety-critical (same as sensor)
+#define TASK_PRIORITY_BUZZER        4       // Output feedback
+#define TASK_PRIORITY_AGENT         2       // Cloud communication
+#define TASK_PRIORITY_IFTTT         2       // Cloud webhook
+#define TASK_PRIORITY_STATS         1       // Monitoring (lowest)
 
 #define TASK_STACK_SENSOR           2048
 #define TASK_STACK_FSM              4096
 #define TASK_STACK_AGENT            4096
 #define TASK_STACK_BUZZER           2048
+#define TASK_STACK_IFTTT            4096
 
 // ============== Queue Configuration ==============
 #define QUEUE_SIZE_TELEMETRY        10
@@ -87,8 +91,6 @@
 #define IFTTT_ENABLED               1       // 0=disabled, 1=enabled
 #define IFTTT_WEBHOOK_URL           "https://maker.ifttt.com/trigger/emergency/json/with/key/YOUR_KEY"
 #define IFTTT_TIMEOUT_MS            5000    // HTTP request timeout
-#define TASK_PRIORITY_IFTTT         1       // Same as agent (low priority)
-#define TASK_STACK_IFTTT            4096    // Stack for HTTP client
 #define QUEUE_SIZE_IFTTT            2       // Webhook trigger queue
 
 #endif // CONFIG_H

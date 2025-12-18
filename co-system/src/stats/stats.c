@@ -72,5 +72,5 @@ void stats_task(void *arg) {
 
 void stats_task_init(void) {
     stats_init();
-    xTaskCreate(stats_task, "stats_task", 4096, NULL, 1, NULL);
+    xTaskCreate(stats_task, "stats_task", 4096, NULL, TASK_PRIORITY_STATS, NULL);
 }
